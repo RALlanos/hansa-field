@@ -8,7 +8,7 @@
 
 ## Objetivo
 
-Sustituir la primera pantalla experimental por una shell operativa consistente: lateral oscuro fijo, barra superior blanca, jerarquía tipográfica reducida y área central orientada a abrir Apps. Hansa Field se identifica con rojo profundo, blanco y grises neutros.
+Sustituir la primera pantalla experimental por una shell operativa consistente: lateral fijo, barra superior blanca, jerarquía tipográfica reducida y área central orientada a abrir Apps. Hansa Field se identifica con rojo profundo, blanco y grises neutros.
 
 ## Límites funcionales
 
@@ -19,10 +19,12 @@ Sustituir la primera pantalla experimental por una shell operativa consistente: 
 
 ## Decisiones de interfaz
 
-1. Una familia tipográfica del sistema y cuatro escalas principales: 12, 14, 16 y 24 px.
-2. Tokens únicos de color, borde, foco y espaciado en `styles.css`.
-3. Componentes de presentación separados: barra lateral, barra superior y contenido de inicio.
-4. Interacciones de lateral accesibles: botón con nombre, `aria-expanded` y comportamiento de teclado nativo.
+1. La portada opera como una puerta de entrada al flujo disponible: Aplicaciones. No replica las opciones futuras en tarjetas ni presenta datos sintéticos.
+2. Una familia tipográfica del sistema y escalas compactas para etiquetas, controles, títulos y texto operativo.
+3. El rojo Hansa se reserva para identidad, selección y acciones principales; las superficies permanecen blancas o grises neutras.
+4. Los iconos de Inicio son SVG propios, consistentes y accesibles; no se usan glifos Unicode como sistema de iconos.
+5. Componentes de presentación separados: barra lateral, barra superior, iconos y contenido de inicio.
+6. Interacciones de lateral accesibles: botón con nombre, `aria-expanded`, foco visible y comportamiento de teclado nativo.
 
 ## Verificación prevista
 

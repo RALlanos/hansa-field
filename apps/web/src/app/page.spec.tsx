@@ -8,9 +8,14 @@ describe("HomePage", () => {
     render(<HomePage />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Inicio" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Tu operación empieza en Aplicaciones",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ir a Apps" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Abrir aplicaciones" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Usuario maestro")).toBeInTheDocument();
   });
 });

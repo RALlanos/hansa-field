@@ -6,7 +6,10 @@ test("muestra la shell de Hansa Field y dirige al único módulo disponible", as
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "Inicio" }),
+    page.getByRole("heading", {
+      level: 1,
+      name: "Tu operación empieza en Aplicaciones",
+    }),
   ).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "Navegación principal" }),

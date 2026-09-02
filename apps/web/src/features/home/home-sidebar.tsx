@@ -1,13 +1,15 @@
 import Link from "next/link";
 
+import { HomeIcon } from "./home-icons";
+
 type HomeSidebarProps = { collapsed: boolean; onToggle: () => void };
 
 const futureModules = [
-  { label: "Importaciones", icon: "⇧" },
-  { label: "Exportaciones", icon: "⇩" },
-  { label: "Capas", icon: "◇" },
-  { label: "Proyectos", icon: "▤" },
-  { label: "Configuración", icon: "⚙" },
+  { label: "Importaciones", icon: "import" },
+  { label: "Exportaciones", icon: "export" },
+  { label: "Capas", icon: "layers" },
+  { label: "Proyectos", icon: "projects" },
+  { label: "Configuración", icon: "settings" },
 ] as const;
 
 export function HomeSidebar({ collapsed, onToggle }: HomeSidebarProps) {
@@ -28,13 +30,13 @@ export function HomeSidebar({ collapsed, onToggle }: HomeSidebarProps) {
           onClick={onToggle}
           type="button"
         >
-          {collapsed ? "›" : "‹"}
+          <HomeIcon name={collapsed ? "chevronRight" : "chevronLeft"} />
         </button>
       </div>
       <nav aria-label="Navegación principal" className="home-nav">
         <p>OPERACIÓN</p>
         <Link className="home-nav-link is-active" href="/apps">
-          <span aria-hidden="true">▦</span>
+          <HomeIcon name="apps" />
           <span>Apps</span>
         </Link>
         <p>PRÓXIMAMENTE</p>
@@ -45,7 +47,7 @@ export function HomeSidebar({ collapsed, onToggle }: HomeSidebarProps) {
             key={item.label}
             title={`${item.label}: módulo aún no implementado`}
           >
-            <span aria-hidden="true">{item.icon}</span>
+            <HomeIcon name={item.icon} />
             <span>{item.label}</span>
           </span>
         ))}

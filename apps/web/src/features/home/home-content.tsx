@@ -1,45 +1,45 @@
 import Link from "next/link";
 
+import { HomeIcon } from "./home-icons";
+
 export function HomeContent() {
   return (
     <section className="home-content" aria-labelledby="home-title">
-      <div className="home-intro">
+      <header className="home-intro">
         <div>
-          <p className="home-kicker">Espacio de trabajo</p>
-          <h2 id="home-title">Gestiona tus aplicaciones de campo</h2>
+          <h1 id="home-title">Tu operación empieza en Aplicaciones</h1>
           <p>
-            Define formularios, publica sus versiones y administra los registros
-            maestros de cada App.
+            Configura formularios, publica versiones y administra registros
+            maestros de campo desde una única superficie de trabajo.
           </p>
         </div>
         <Link className="home-primary-action" href="/apps">
-          Ir a Apps <span aria-hidden="true">→</span>
+          Abrir aplicaciones <HomeIcon name="arrowRight" />
         </Link>
-      </div>
-      <section aria-labelledby="apps-module-title" className="home-module">
-        <div className="home-module-icon" aria-hidden="true">
-          ▦
+      </header>
+      <section aria-labelledby="apps-module-title" className="home-apps-focus">
+        <div className="home-apps-focus-heading">
+          <span aria-hidden="true" className="home-module-icon">
+            <HomeIcon name="apps" />
+          </span>
+          <div>
+            <h2 id="apps-module-title">Aplicaciones</h2>
+            <p>El módulo disponible para estructurar y operar tus datos.</p>
+          </div>
         </div>
-        <div>
-          <p className="home-kicker">Módulo disponible</p>
-          <h2 id="apps-module-title">Aplicaciones</h2>
-          <p>
-            Crea una App, configura atributos por tipo y abre sus registros en
-            mapa, tabla o vista dividida.
-          </p>
-        </div>
+        <ul className="home-capability-list">
+          <li>Constructor de formularios tipados</li>
+          <li>Versiones publicadas e inmutables</li>
+          <li>Registros de punto, línea, polígono o sin geometría</li>
+        </ul>
         <Link className="home-secondary-action" href="/apps">
-          Abrir Apps
+          Ver catálogo de Apps <HomeIcon name="arrowRight" />
         </Link>
       </section>
-      <section aria-labelledby="home-boundary-title" className="home-boundary">
-        <h2 id="home-boundary-title">Preparación de la plataforma</h2>
-        <p>
-          Importaciones, proyectos, capas y configuración tendrán sus propios
-          módulos. Aún no se muestran datos ni acciones simuladas en estos
-          accesos.
-        </p>
-      </section>
+      <p className="home-roadmap-note">
+        Importaciones, exportaciones, capas, proyectos y configuración se
+        incorporarán como módulos independientes cuando sus flujos estén listos.
+      </p>
     </section>
   );
 }

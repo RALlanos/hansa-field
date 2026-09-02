@@ -127,6 +127,7 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 17:36 UTC-04:00 | Shell de inicio Hansa Field reescrita. | El inicio quedó dividido en lateral, barra superior y contenido; Apps es la ruta funcional y el resto se representa de forma explícita como módulos futuros, sin datos simulados. |
 | 2026-09-02 17:37 UTC-04:00 | Rediseño de Inicio verificado. | `pnpm quality:full` aprobó formato, lint, tipos, 14 pruebas unitarias, 2 integraciones con PostGIS, build y 2 pruebas E2E Chromium, incluida la contracción del lateral. |
 | 2026-09-02 17:45 UTC-04:00 | Inicio de shell persistente de Apps. | Se documentó el layout compartido, los límites de navegación y el cambio de color plomo antes de editar las rutas. |
+| 2026-09-02 18:10 UTC-04:00 | Reestructuración de Inicio con Impeccable. | La portada queda definida como superficie operativa: elimina tarjetas y mensajes duplicados, usa iconos SVG coherentes, concentra la siguiente acción en Aplicaciones y mantiene los módulos futuros como navegación no operativa. |
 
 ## Cierre de la entrega
 
