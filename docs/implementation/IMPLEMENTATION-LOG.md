@@ -104,6 +104,8 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 15:30 UTC-04:00    | Inicio del primer flujo funcional: Apps.                                                       | Contrato `GET/POST /api/apps` documentado antes de la implementación; se validará en el borde y persistirá contra PostGIS.                                           |
 | 2026-09-02 15:36:39 UTC-04:00 | API de Apps disponible contra PostGIS.                                                         | `GET /api/apps` respondió `200` y lista vacía desde la API local; no se insertaron datos de muestra en la base del usuario.                                          |
 
+| 2026-09-02 16:01 UTC-04:00 | Inicio del constructor versionado de Apps. | Cada esquema se almacena como una nueva versión inmutable en `app_versions`; así los registros históricos podrán conservar el formulario que les corresponde. |
+
 ## Cierre de la entrega
 
 Pendiente. Al finalizar se registrarán fecha/hora, pruebas ejecutadas, resultado demostrado, cambios respecto del plan y percances reales si existieron.

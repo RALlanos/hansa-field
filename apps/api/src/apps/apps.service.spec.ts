@@ -29,4 +29,24 @@ describe("AppsService", () => {
       ["POSTES", "Postes", ["Point"]],
     );
   });
+
+  it("creates the next immutable schema version for an App", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValue({
+        rows: [
+          {
+            id: "version-id",
+            version: 1,
+            schema_definition: { sections: [] },
+            created_at: new Date("2026-09-02T00:00:00.000Z"),
+          },
+        ],
+      });
+    const service = new AppsService({ query } as never);
+
+    await expect(
+      service.createVersion("app-id", { sections: [] }),
+    ).resolves.toMatchObject({ version: 1, schema: { sections: [] } });
+  });
 });

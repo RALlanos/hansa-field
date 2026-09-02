@@ -21,6 +21,14 @@ export type AppSummary = Readonly<{
   createdAt: string;
 }>;
 
+export type AppSchema = Readonly<{ sections: unknown[] }>;
+export type AppVersion = Readonly<{
+  id: string;
+  version: number;
+  schema: AppSchema;
+  createdAt: string;
+}>;
+
 type AppRow = Readonly<{
   id: string;
   code: string;
@@ -78,5 +86,27 @@ export class AppsService {
       }
       throw error;
     }
+  }
+
+  async createVersion(appId: string, schema: AppSchema): Promise<AppVersion> {
+    const result = await this.database.query<{
+      id: string;
+      version: number;
+      schema_definition: AppSchema;
+      created_at: Date;
+    }>(
+      `INSERT INTO app_versions (app_id, version, schema_definition)
+       VALUES ($1, COALESCE((SELECT MAX(version) + 1 FROM app_versions WHERE app_id = $1), 1), $2)
+       RETURNING id, version, schema_definition, created_at`,
+      [appId, schema],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("Database did not return the App version.");
+    return {
+      id: row.id,
+      version: row.version,
+      schema: row.schema_definition,
+      createdAt: row.created_at.toISOString(),
+    };
   }
 }

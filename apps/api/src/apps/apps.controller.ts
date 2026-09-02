@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Param,
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { z } from "zod";
@@ -26,6 +27,41 @@ const createAppSchema = z
     allowedGeometries: z
       .array(z.enum(["Point", "LineString", "Polygon"]))
       .min(1),
+  })
+  .strict();
+const appSchemaSchema = z
+  .object({
+    sections: z.array(
+      z
+        .object({
+          id: z.string().uuid(),
+          title: z.string().trim().min(1).max(120),
+          fields: z.array(
+            z
+              .object({
+                id: z.string().uuid(),
+                key: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
+                label: z.string().trim().min(1).max(120),
+                type: z.enum([
+                  "shortText",
+                  "longText",
+                  "number",
+                  "boolean",
+                  "date",
+                  "time",
+                  "singleChoice",
+                  "multipleChoice",
+                  "photo",
+                  "file",
+                  "signature",
+                ]),
+                required: z.boolean().default(false),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -49,5 +85,18 @@ export class AppsController {
         details: result.error.flatten(),
       });
     return this.appsService.create(result.data as CreateAppInput);
+  }
+
+  @Post(":appId/versions")
+  @HttpCode(HttpStatus.CREATED)
+  async createVersion(@Param("appId") appId: string, @Body() body: unknown) {
+    const result = appSchemaSchema.safeParse(body);
+    if (!result.success)
+      throw new UnprocessableEntityException({
+        code: "VALIDATION_ERROR",
+        message: "Esquema de App inválido.",
+        details: result.error.flatten(),
+      });
+    return this.appsService.createVersion(appId, result.data);
   }
 }
