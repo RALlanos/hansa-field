@@ -72,6 +72,7 @@ Registrar aquí únicamente cambios reales respecto del plan aprobado, incluyend
 | 2026-09-02 12:49:31 UTC-04:00 | La lista de dependencias autorizadas para ejecutar scripts se trasladó de `package.json` a `pnpm-workspace.yaml`. | pnpm 11.19 informó que esa configuración ya no se lee desde `package.json`.                                                                                     | No cambia el alcance; mantiene bloqueados los scripts de instalación en la ubicación vigente.                                              |
 | 2026-09-02 12:53:59 UTC-04:00 | El puerto web local cambió de `3000` a `3200`.                                                                    | Los puertos `3000` y `3002` están ocupados por procesos existentes relacionados con el entorno del ERP.                                                         | Hansa Field evita interferencia local; la API permanece en `3100` y PostgreSQL en `5434`.                                                  |
 | 2026-09-02 12:58:15 UTC-04:00 | La inyección del `HealthService` pasó a declarar explícitamente su token.                                         | El ejecutor de desarrollo `tsx` no emite la misma metadata implícita de decoradores que la compilación TypeScript, aunque las pruebas y el build habían pasado. | El controlador funciona de forma consistente en desarrollo y producción; se añadió prueba modular y se mantiene la comprobación HTTP real. |
+| 2026-09-02 13:02:43 UTC-04:00 | La imagen de base cambió de `postgis/postgis:17-3.6` a `postgis/postgis:17-3.6-alpine`. | El registro oficial no publica la primera etiqueta; sí publica la variante Alpine para PostgreSQL 17 y PostGIS 3.6.4. | Se mantiene la versión funcional prevista con una etiqueta existente y verificable. |
 
 ## Percances durante la implementación
 
@@ -82,6 +83,7 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 12:45:41 UTC-04:00 | Git rechazó el primer commit documental.                          | La PC no tenía `user.name` ni `user.email` configurados. Los archivos ya estaban preparados, pero no se creó ningún commit.                                           | Se configurará una identidad técnica únicamente en este repositorio, sin alterar la configuración global ni publicar contenido.               |
 | 2026-09-02 12:53:59 UTC-04:00 | Next.js no pudo iniciar en el puerto `3000`.                      | El puerto ya estaba ocupado por el entorno local existente; también se confirmó `3002` en uso.                                                                        | No se detuvo ningún proceso externo. Se trasladó la web de Hansa Field a `3200` y se actualizaron configuración y documentación.              |
 | 2026-09-02 12:58:15 UTC-04:00 | El health check devolvió HTTP 500 durante la primera prueba real. | `HealthController` recibía `undefined` en desarrollo por diferencia de metadata de decoradores entre `tsx` y `tsc`. La prueba unitaria aislada no cruzaba ese límite. | Se reprodujo mediante HTTP, se declaró `@Inject(HealthService)`, se añadió una prueba modular y se exigirá prueba HTTP además de la unitaria. |
+| 2026-09-02 13:02:43 UTC-04:00 | Docker no pudo resolver `postgis/postgis:17-3.6`. | La etiqueta no existe en Docker Hub; el intento terminó antes de crear el contenedor o volumen. | Se verificaron Docker Hub y el repositorio oficial y se adoptó `17-3.6-alpine` (PostGIS 3.6.4). |
 
 ## Avances verificados
 
@@ -89,6 +91,7 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | ----------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-02 12:50 UTC-04:00    | Workspace independiente, dependencias fijadas y servicio PostGIS definido en Compose.          | Instalación congelada reproducible, scripts de dependencias bloqueados, `docker compose config` válido, formato y lint limpios.                                |
 | 2026-09-02 13:01:42 UTC-04:00 | Primera shell web/API: portada, área de Apps bloqueada hasta persistencia y health check real. | 4 pruebas pasan; tipos, lint y builds pasan; `GET /api/health/live` responde correctamente; portada y `/apps` verificadas en navegador sin errores de consola. |
+| 2026-09-02 13:05:21 UTC-04:00 | Servicio geoespacial local disponible y aislado del ERP.                                      | El contenedor está saludable en `5434`; PostgreSQL 17 confirmó PostGIS 3.6.4, GEOS 3.14.1 y PROJ 9.8.1 mediante consulta SQL real.                               |
 
 ## Cierre de la entrega
 

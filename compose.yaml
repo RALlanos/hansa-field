@@ -2,7 +2,7 @@ name: hansa-field
 
 services:
   database:
-    image: postgis/postgis:17-3.6
+    image: postgis/postgis:17-3.6-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hansa_field}
       POSTGRES_USER: ${POSTGRES_USER:-hansa_field}
