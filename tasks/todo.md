@@ -8,14 +8,14 @@
 
 **Acceptance criteria:**
 
-- [ ] Versiones y puertos requeridos están documentados.
-- [ ] El repositorio contiene estructura web/API compartida y reglas de trabajo.
-- [ ] No se depende del repositorio ni de la base del ERP.
+- [x] Versiones y puertos requeridos están documentados.
+- [x] El repositorio contiene estructura web/API compartida y reglas de trabajo.
+- [x] No se depende del repositorio ni de la base del ERP.
 
 **Verification:**
 
-- [ ] Instalación reproducible de dependencias.
-- [ ] Comando mínimo de diagnóstico exitoso.
+- [x] Instalación reproducible de dependencias.
+- [x] Comando mínimo de diagnóstico exitoso.
 
 **Dependencies:** None
 

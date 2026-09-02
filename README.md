@@ -21,7 +21,7 @@ docker compose up -d database
 pnpm dev
 ```
 
-La web utilizará `http://localhost:3000`, la API `http://localhost:3100` y PostgreSQL el puerto local `5434`, evitando interferir con el ERP local.
+La web utilizará `http://localhost:3200`, la API `http://localhost:3100` y PostgreSQL el puerto local `5434`, evitando interferir con el ERP local.
 
 ## Comandos
 
