@@ -38,6 +38,119 @@ body {
   border: 0;
 }
 
+.apps-catalog {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+.catalog-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.catalog-header h1 {
+  margin: 0.3rem 0;
+  font-size: 2rem;
+}
+.catalog-header p:last-child {
+  margin: 0;
+  color: var(--muted);
+}
+.app-list {
+  padding-top: 1rem;
+}
+.app-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.app-row-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  color: var(--brand);
+  background: #fff0f0;
+  font-size: 1.5rem;
+}
+.app-row h2,
+.app-row p {
+  margin: 0;
+}
+.app-row p {
+  margin-top: 0.25rem;
+  color: var(--muted);
+}
+.app-row .secondary-button {
+  margin-left: auto;
+}
+.catalog-error {
+  padding: 0.75rem;
+  border: 1px solid #f5b5ba;
+  color: #991b1b;
+  background: #fff1f2;
+}
+.modal-backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: #17233199;
+}
+.app-form {
+  width: min(100%, 30rem);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 1rem 3rem #0004;
+}
+.form-heading,
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.form-heading h2 {
+  margin: 0.2rem 0 1rem;
+}
+.app-form > label {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  font-weight: 700;
+}
+.app-form input:not([type="checkbox"]) {
+  width: 100%;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  font: inherit;
+}
+.app-form fieldset {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+}
+.app-form fieldset label {
+  display: flex;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+.form-actions {
+  margin-top: 1.5rem;
+  justify-content: end;
+}
+
 .field-app {
   display: flex;
   min-height: 100vh;

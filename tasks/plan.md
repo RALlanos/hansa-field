@@ -57,6 +57,15 @@ Objetivo demostrable: crear una App, importar un conjunto geográfico sencillo, 
 - Configuración contextual `project_app` y campos exclusivos de membresía.
 - PDF versionado del diccionario de datos.
 
+### Applications focus: approved build order
+
+1. Catálogo de Apps y apertura desde la interfaz.
+2. Constructor versionado de secciones y campos.
+3. Captura manual de registros, con geometría opcional.
+4. Tres modos de visualización: mapa, dividido y tabla.
+
+Los Proyectos solo consumirán posteriormente estos contratos; no forman parte de este incremento.
+
 ### Phase 4: Projects and organization
 
 - Proyectos y contenedores anidados.

@@ -85,6 +85,45 @@
 
 **Estimated scope:** M
 
+### Task 4a: Application catalog interface
+
+**Description:** Conectar el catálogo de Apps a la API y abrir la App seleccionada.
+
+**Acceptance criteria:**
+
+- [ ] El usuario maestro crea y ve Apps sin datos de muestra.
+- [ ] Cada App ofrece acceso a constructor y registros.
+
+**Verification:**
+
+- [ ] Prueba API/UI de crear y listar.
+- [ ] Comprobación manual en navegador.
+
+**Dependencies:** Task 4 API
+
+### Task 4b: Versioned App builder
+
+**Description:** Construir secciones y campos configurables de una App.
+
+**Acceptance criteria:**
+
+- [ ] Tipos de campo base y media se agregan, nombran y ordenan.
+- [ ] Guardar conserva una versión de esquema.
+- [ ] La configuración futura de permisos y Proyecto tiene puntos de extensión explícitos.
+
+**Dependencies:** Task 4a
+
+### Task 5a: Manual App records and views
+
+**Description:** Crear registros manuales y alternar mapa, dividido y tabla.
+
+**Acceptance criteria:**
+
+- [ ] Registros tabulares, Point, LineString y Polygon se capturan según la App.
+- [ ] Los tres modos de vista usan los mismos datos.
+
+**Dependencies:** Task 4b
+
 ### Task 5: Master records with UUID
 
 **Description:** Crear y consultar registros maestros de una App con atributos dinámicos mínimos y geometría mixta.
