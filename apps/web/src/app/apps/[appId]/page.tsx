@@ -283,6 +283,12 @@ export default function AppBuilderPage() {
         <p className="builder-code">
           {app.code} · {app.allowedGeometries.join(", ")}
         </p>
+        <Link
+          className="secondary-button app-configure-link"
+          href={`/apps/${appId}/records`}
+        >
+          View records
+        </Link>
         <button
           className="primary-button"
           disabled={saving}

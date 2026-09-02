@@ -70,3 +70,11 @@ La primera versión es `1`; guardar nuevamente crea la siguiente. Los registros 
 ## `PATCH /api/apps/:appId`
 
 Actualiza únicamente los ajustes globales visuales: `description`, `mapIcon` (`pin`, `post`, `cable`, `node`, `building`) y `mapColor` hexadecimal. No modifica ni convierte atributos ya creados.
+
+## Registros manuales
+
+`GET /api/apps/:appId/records` lista los registros de una App.
+
+`POST /api/apps/:appId/records` crea un registro con `attributes` y una geometría `Point` GeoJSON o `null`. La versión más reciente guardada de la App se vincula automáticamente. `PATCH /api/apps/:appId/records/:recordId` edita atributos y ubicación sin cambiar esa versión histórica.
+
+La interfaz inicial permite Punto o sin ubicación; líneas, polígonos, importación y edición directa sobre el mapa se incorporarán como incrementos posteriores.

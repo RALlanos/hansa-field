@@ -119,8 +119,8 @@
 
 **Acceptance criteria:**
 
-- [ ] Registros tabulares, Point, LineString y Polygon se capturan según la App.
-- [ ] Los tres modos de vista usan los mismos datos.
+- [ ] Registros tabulares, Point, LineString y Polygon se capturan según la App. (Punto y sin ubicación entregados; líneas y polígonos pendientes.)
+- [x] Los tres modos de vista usan los mismos datos.
 
 **Dependencies:** Task 4b
 

@@ -81,4 +81,12 @@ export const migrations: readonly Migration[] = [
         DROP COLUMN IF EXISTS description;
     `,
   },
+  {
+    id: "0003_optional_record_geometry",
+    up: `ALTER TABLE records ALTER COLUMN geometry DROP NOT NULL;`,
+    down: `
+      DELETE FROM records WHERE geometry IS NULL;
+      ALTER TABLE records ALTER COLUMN geometry SET NOT NULL;
+    `,
+  },
 ];

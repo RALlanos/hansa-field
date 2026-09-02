@@ -14,3 +14,4 @@ Todos los cambios relevantes para usuarios y operadores se documentarán aquí.
 - API inicial de Apps para crear y listar definiciones geoespaciales con validación de entrada y código único.
 - Constructor de Apps inspirado en el flujo de Fulcrum: paleta de campos, secciones, edición de propiedades y guardado de versiones inmutables.
 - Constructor corregido: el tipo de atributo es fijo, las propiedades del campo se abren por separado y la App cuenta con icono, color y reglas booleanas de visibilidad.
+- Vista de Registros por App con modos mapa, dividido y tabla; permite crear y editar registros manuales de Punto o sin ubicación.

@@ -111,6 +111,8 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 16:10 UTC-04:00 | Constructor funcional de Apps. | El catálogo enlaza la App real; se cargan su definición y última versión. La paleta permite arrastrar o añadir campos, secciones y propiedades; guardar crea una versión inmutable mediante API. |
 | 2026-09-02 16:14 UTC-04:00 | Corrección de modelo del constructor. | Se separarán los ajustes globales de la App de las propiedades de un campo. El tipo será inmutable después de crearlo; las reglas de visibilidad se guardarán como lógica booleana del campo. |
 | 2026-09-02 16:24 UTC-04:00 | Ajustes y reglas del constructor separados. | La App tiene descripción, icono y color persistentes. Un atributo abre su editor propio, conserva tipo fijo y admite condiciones `all`/`any`, operadores y conservación opcional del valor al ocultarse. |
+| 2026-09-02 16:25 UTC-04:00 | Inicio de Registros manuales por App. | Se habilitará una vista de registros para crear y editar datos manuales, inicialmente con Punto o sin geometría, vinculados a la versión de formulario vigente. |
+| 2026-09-02 16:28 UTC-04:00 | Primer flujo de Registros manuales. | `View records` abre los mismos datos como mapa, vista dividida o tabla. Se crean y editan atributos con el formulario versionado y coordenadas de Punto opcionales. |
 
 ## Cierre de la entrega
 
