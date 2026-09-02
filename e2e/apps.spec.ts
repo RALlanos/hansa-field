@@ -8,4 +8,11 @@ test("muestra el catálogo de Apps sin requerir datos de muestra", async ({
     page.getByRole("heading", { name: "Apps", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Nueva App" })).toBeEnabled();
+  await expect(
+    page.getByRole("navigation", { name: "Navegación de Hansa Field" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Contraer menú" }).click();
+  await expect(
+    page.getByRole("button", { name: "Expandir menú" }),
+  ).toBeVisible();
 });

@@ -1,13 +1,13 @@
 :root {
   color-scheme: light;
-  --ink: #172033;
-  --muted: #667085;
+  --ink: #252a30;
+  --muted: #68717b;
   --surface: #ffffff;
-  --canvas: #f5f7fa;
-  --border: #dfe4ea;
-  --brand: #132c46;
-  --brand-dark: #0b1d2f;
-  --focus: #2563eb;
+  --canvas: #f3f4f5;
+  --border: #d9dde1;
+  --brand: #3b434c;
+  --brand-dark: #252b31;
+  --focus: #526d84;
   --radius: 0.5rem;
 }
 
@@ -644,6 +644,176 @@ body {
   font-size: 0.85rem;
 }
 
+.apps-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--canvas);
+}
+.apps-sidebar {
+  display: flex;
+  position: sticky;
+  top: 0;
+  width: 15rem;
+  height: 100vh;
+  flex: 0 0 15rem;
+  flex-direction: column;
+  color: #d5d9dd;
+  background: #292e34;
+  transition:
+    width 160ms ease,
+    flex-basis 160ms ease;
+}
+.apps-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4rem;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid #ffffff18;
+}
+.apps-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  border-radius: 0.35rem;
+  color: #fff;
+  background: #5a646e;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+.apps-brand-copy,
+.apps-user-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+.apps-brand-copy strong {
+  color: #fff;
+  font-size: 0.9rem;
+}
+.apps-brand-copy small,
+.apps-user-copy small {
+  color: #aeb7bf;
+  font-size: 0.7rem;
+}
+.apps-collapse {
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-left: auto;
+  border: 1px solid #ffffff2b;
+  border-radius: 0.3rem;
+  color: #e8ebed;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.apps-collapse:hover {
+  background: #ffffff14;
+}
+.apps-navigation {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1.1rem 0.7rem;
+}
+.apps-navigation > p {
+  margin: 0.85rem 0 0.35rem;
+  padding: 0 0.45rem;
+  color: #929ca5;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.apps-navigation > p:first-child {
+  margin-top: 0;
+}
+.apps-navigation-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  padding: 0 0.7rem;
+  border-radius: 0.35rem;
+  color: #d5d9dd;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.apps-navigation-link > span:first-child {
+  width: 1rem;
+  text-align: center;
+}
+.apps-navigation-link.is-active {
+  color: #fff;
+  background: #484f57;
+}
+.apps-navigation-link:not(.is-disabled):hover {
+  background: #ffffff12;
+}
+.apps-navigation-link.is-disabled {
+  color: #858e97;
+  cursor: not-allowed;
+}
+.apps-user {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding: 1rem 1.1rem;
+  border-top: 1px solid #ffffff18;
+}
+.apps-avatar {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: #31373d;
+  background: #e6e9ec;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+.apps-user-copy strong {
+  color: #f5f6f7;
+  font-size: 0.76rem;
+}
+.apps-shell-content {
+  min-width: 0;
+  flex: 1;
+}
+.apps-shell.is-collapsed .apps-sidebar {
+  width: 4.25rem;
+  flex-basis: 4.25rem;
+}
+.apps-shell.is-collapsed .apps-brand {
+  justify-content: center;
+  padding: 0 0.5rem;
+}
+.apps-shell.is-collapsed .apps-brand-copy,
+.apps-shell.is-collapsed .apps-navigation > p,
+.apps-shell.is-collapsed .apps-navigation-link > span:last-child,
+.apps-shell.is-collapsed .apps-user-copy {
+  display: none;
+}
+.apps-shell.is-collapsed .apps-navigation {
+  padding-inline: 0.65rem;
+}
+.apps-shell.is-collapsed .apps-navigation-link {
+  justify-content: center;
+  padding: 0;
+}
+.apps-shell.is-collapsed .apps-user {
+  justify-content: center;
+  padding-inline: 0.5rem;
+}
+.apps-collapse:focus-visible,
+.apps-navigation-link:focus-visible {
+  outline: 3px solid #b4c4d2;
+  outline-offset: 3px;
+}
+
 /* Inicio de Hansa Field: shell operativa propia, separada de los módulos. */
 .home-shell {
   display: flex;
@@ -682,7 +852,7 @@ body {
   flex: 0 0 auto;
   border-radius: 0.4rem;
   color: #fff;
-  background: #234b73;
+  background: #5a646e;
   font-size: 0.86rem;
   font-weight: 800;
 }
@@ -760,7 +930,7 @@ body {
 }
 .home-nav-link.is-active {
   color: #fff;
-  background: #1c3e61;
+  background: #484f57;
 }
 .home-nav-link:not(.is-disabled):hover {
   background: #ffffff12;
@@ -784,7 +954,7 @@ body {
   height: 1.9rem;
   flex: 0 0 auto;
   border-radius: 50%;
-  color: #10263e;
+  color: #31373d;
   background: #dbe8f4;
   font-size: 0.65rem;
   font-weight: 800;
@@ -887,10 +1057,10 @@ body {
 .home-primary-action {
   padding: 0 0.9rem;
   color: #fff;
-  background: #132c46;
+  background: #3b434c;
 }
 .home-primary-action:hover {
-  background: #0b1d2f;
+  background: #252b31;
 }
 .home-module {
   display: grid;
@@ -907,7 +1077,7 @@ body {
   width: 2.5rem;
   height: 2.5rem;
   background: #e4edf6;
-  color: #173c60;
+  color: #3b434c;
   font-size: 1.1rem;
 }
 .home-module h2,
@@ -918,7 +1088,7 @@ body {
 .home-secondary-action {
   padding: 0 0.8rem;
   border: 1px solid #bfd0df;
-  color: #173c60;
+  color: #3b434c;
   background: #fff;
 }
 .home-secondary-action:hover {
@@ -959,6 +1129,32 @@ body {
   padding-inline: 0.5rem;
 }
 @media (max-width: 46rem) {
+  .apps-sidebar {
+    width: 4.25rem;
+    flex-basis: 4.25rem;
+  }
+  .apps-brand {
+    justify-content: center;
+    padding: 0 0.5rem;
+  }
+  .apps-brand-copy,
+  .apps-navigation > p,
+  .apps-navigation-link > span:last-child,
+  .apps-user-copy,
+  .apps-collapse {
+    display: none;
+  }
+  .apps-navigation {
+    padding-inline: 0.65rem;
+  }
+  .apps-navigation-link {
+    justify-content: center;
+    padding: 0;
+  }
+  .apps-user {
+    justify-content: center;
+    padding-inline: 0.5rem;
+  }
   .home-sidebar {
     width: 4.25rem;
     flex-basis: 4.25rem;
