@@ -16,3 +16,12 @@ test("muestra el catálogo de Apps sin requerir datos de muestra", async ({
     page.getByRole("button", { name: "Expandir menú" }),
   ).toBeVisible();
 });
+
+test("navega al flujo básico de importación", async ({ page }) => {
+  await page.goto("/apps");
+  await page.getByRole("link", { name: "Importaciones" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Nueva importación" }),
+  ).toBeVisible();
+  await expect(page.getByText("Seleccionar archivo GeoJSON")).toBeVisible();
+});
