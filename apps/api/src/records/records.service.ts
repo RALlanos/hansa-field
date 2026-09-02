@@ -5,20 +5,20 @@ import {
   type DatabaseQuery,
 } from "../database/database.service.js";
 
-export type GeoJsonPoint = Readonly<{
-  type: "Point";
-  coordinates: [number, number];
-}>;
+export type GeoJsonGeometry =
+  | Readonly<{ type: "Point"; coordinates: [number, number] }>
+  | Readonly<{ type: "LineString"; coordinates: [number, number][] }>
+  | Readonly<{ type: "Polygon"; coordinates: [number, number][][] }>;
 export type CreateRecordInput = Readonly<{
   attributes: Record<string, unknown>;
-  geometry: GeoJsonPoint | null;
+  geometry: GeoJsonGeometry | null;
 }>;
 export type AppRecord = Readonly<{
   id: string;
   appId: string;
   appVersionId: string;
   attributes: Record<string, unknown>;
-  geometry: GeoJsonPoint | null;
+  geometry: GeoJsonGeometry | null;
   createdAt: string;
   updatedAt: string;
 }>;
@@ -28,7 +28,7 @@ type RecordRow = Readonly<{
   app_id: string;
   app_version_id: string;
   attributes: Record<string, unknown>;
-  geometry: GeoJsonPoint | null;
+  geometry: GeoJsonGeometry | null;
   created_at: Date;
   updated_at: Date;
 }>;
@@ -51,12 +51,20 @@ export class RecordsService {
     @Inject(DatabaseService) private readonly database: DatabaseQuery,
   ) {}
 
-  async list(appId: string): Promise<AppRecord[]> {
+  async list(
+    appId: string,
+    bounds?: readonly [number, number, number, number],
+    limit = 500,
+  ): Promise<AppRecord[]> {
     const result = await this.database.query<RecordRow>(
       `SELECT id, app_id, app_version_id, attributes,
               ST_AsGeoJSON(geometry)::jsonb AS geometry, created_at, updated_at
-       FROM records WHERE app_id = $1 ORDER BY updated_at DESC`,
-      [appId],
+       FROM records
+       WHERE app_id = $1
+         AND ($2::double precision IS NULL OR (geometry IS NOT NULL AND
+           ST_Intersects(geometry, ST_MakeEnvelope($2, $3, $4, $5, 4326))))
+       ORDER BY updated_at DESC LIMIT $6`,
+      [appId, ...(bounds ?? [null, null, null, null]), limit],
     );
     return result.rows.map(mapRow);
   }

@@ -39,6 +39,8 @@ describe("foundation database migration", () => {
       "app_definitions",
       "app_versions",
       "hansa_field_migrations",
+      "project_apps",
+      "projects",
       "records",
     ]);
 
@@ -47,6 +49,15 @@ describe("foundation database migration", () => {
        VALUES ('POSTES', 'Postes', ARRAY['Point']) RETURNING id`,
     );
     const appId = app.rows[0]?.id;
+    const project = await client.query<{ id: string }>(
+      `INSERT INTO projects (code, name) VALUES ('LPZ_FTTH', 'La Paz FTTH') RETURNING id`,
+    );
+    await expect(
+      client.query(
+        `INSERT INTO project_apps (project_id, app_id) VALUES ($1, $2)`,
+        [project.rows[0]?.id, appId],
+      ),
+    ).resolves.toBeDefined();
     const version = await client.query<{ id: string }>(
       `INSERT INTO app_versions (app_id, version, schema_definition)
        VALUES ($1, 1, '{"fields": []}') RETURNING id`,

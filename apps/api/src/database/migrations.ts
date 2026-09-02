@@ -89,4 +89,26 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE records ALTER COLUMN geometry SET NOT NULL;
     `,
   },
+  {
+    id: "0004_projects",
+    up: `
+      CREATE TABLE projects (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        code text NOT NULL UNIQUE CHECK (code ~ '^[A-Z][A-Z0-9_]{1,63}$'),
+        name text NOT NULL CHECK (length(trim(name)) BETWEEN 2 AND 120),
+        description text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE TABLE project_apps (
+        project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        app_id uuid NOT NULL REFERENCES app_definitions(id) ON DELETE RESTRICT,
+        PRIMARY KEY (project_id, app_id)
+      );
+      CREATE INDEX project_apps_app_id_idx ON project_apps (app_id);
+    `,
+    down: `
+      DROP TABLE IF EXISTS project_apps;
+      DROP TABLE IF EXISTS projects;
+    `,
+  },
 ];
