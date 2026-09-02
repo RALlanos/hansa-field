@@ -4,30 +4,25 @@ import { describe, expect, it } from "vitest";
 import { FieldWorkspace } from "./field-workspace";
 
 describe("FieldWorkspace", () => {
-  it("provides the master user with navigation, filters, map and record list", () => {
+  it("provides a consistent Hansa Field home shell with Apps as the available module", () => {
     render(<FieldWorkspace />);
 
     expect(
-      screen.getByRole("navigation", { name: "Principal" }),
+      screen.getByRole("navigation", { name: "Navegación principal" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Inicio" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Registros" }),
+      screen.getByRole("heading", {
+        name: "Gestiona tus aplicaciones de campo",
+      }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Nuevo registro" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Mapa de registros" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: "Lista de registros" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Apps" })).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /Apps/ })[0]).toHaveAttribute(
       "href",
       "/apps",
     );
-    expect(
-      screen.queryByRole("button", { name: "Proyectos" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Proyectos").parentElement).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 });
