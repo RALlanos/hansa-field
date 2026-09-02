@@ -22,5 +22,9 @@ describe("FieldWorkspace", () => {
     expect(
       screen.getByRole("table", { name: "Lista de registros" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apps" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Proyectos" }),
+    ).not.toBeInTheDocument();
   });
 });

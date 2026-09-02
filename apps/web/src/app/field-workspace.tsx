@@ -2,18 +2,6 @@
 
 import { useState } from "react";
 
-const navigation = [
-  ["▦", "Registros"],
-  ["⌖", "Mapa"],
-  ["▦", "Aplicaciones"],
-  ["▱", "Proyectos"],
-  ["✓", "Tareas"],
-  ["↥", "Importaciones"],
-  ["⇩", "Exportaciones"],
-  ["≋", "Capas"],
-  ["⚙", "Configuración"],
-] as const;
-
 const records = [
   [
     "Pendiente",
@@ -50,28 +38,53 @@ const records = [
 ] as const;
 
 export function FieldWorkspace() {
-  const [activeNav, setActiveNav] = useState("Registros");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(true);
 
   return (
     <main className="field-app">
-      <aside className="field-sidebar">
+      <aside
+        className={
+          sidebarCollapsed ? "field-sidebar collapsed" : "field-sidebar"
+        }
+      >
         <div className="field-logo" aria-label="Hansa Field">
           <span className="field-logo-mark">⌾</span>
           <span>HANSA FIELD</span>
+          <button
+            aria-label="Comprimir menú"
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            type="button"
+          >
+            ☰
+          </button>
         </div>
         <nav aria-label="Principal" className="field-nav">
-          {navigation.map(([icon, label]) => (
-            <button
-              className={activeNav === label ? "nav-item active" : "nav-item"}
-              key={label}
-              onClick={() => setActiveNav(label)}
-              type="button"
-            >
-              <span aria-hidden="true">{icon}</span>
-              {label}
-            </button>
-          ))}
+          <button className="nav-item active" type="button">
+            <span aria-hidden="true">▦</span>Apps
+          </button>
+          <button
+            aria-expanded={setupOpen}
+            className="nav-item setup-toggle"
+            onClick={() => setSetupOpen(!setupOpen)}
+            type="button"
+          >
+            <span aria-hidden="true">⚙</span>Setup{" "}
+            <i aria-hidden="true">{setupOpen ? "⌃" : "⌄"}</i>
+          </button>
+          {setupOpen && (
+            <div className="setup-links">
+              <span>CONFIGURACIÓN</span>
+              <button type="button">Importaciones</button>
+              <button type="button">Exportaciones</button>
+              <button type="button">Capas de mapa</button>
+              <span>ORGANIZACIÓN</span>
+              <button type="button">Perfil de miembro</button>
+              <button type="button">API</button>
+            </div>
+          )}
         </nav>
         <div className="user-chip">
           <span className="avatar">JM</span>

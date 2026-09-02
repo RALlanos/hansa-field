@@ -130,6 +130,63 @@ body {
   font-weight: 800;
 }
 
+.sidebar-toggle {
+  margin-left: auto;
+  border: 0;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+}
+.setup-toggle {
+  margin-top: 1.5rem;
+}
+.setup-toggle i {
+  margin-left: auto;
+  font-style: normal;
+}
+.setup-links {
+  padding: 0.35rem 0.75rem 1rem 2rem;
+}
+.setup-links span {
+  display: block;
+  margin-top: 0.8rem;
+  color: #ffd7da;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+.setup-links button {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0;
+  border: 0;
+  color: #fff;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.field-sidebar.collapsed {
+  flex-basis: 3.75rem;
+}
+.field-sidebar.collapsed .field-logo > span:not(.field-logo-mark),
+.field-sidebar.collapsed .nav-item,
+.field-sidebar.collapsed .setup-links,
+.field-sidebar.collapsed .user-chip > span:nth-child(2),
+.field-sidebar.collapsed .user-chip > :last-child {
+  font-size: 0;
+}
+.field-sidebar.collapsed .field-logo,
+.field-sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding-inline: 0.5rem;
+}
+.field-sidebar.collapsed .nav-item span {
+  font-size: 1rem;
+}
+.field-sidebar.collapsed .sidebar-toggle {
+  display: none;
+}
+
 .field-main {
   min-width: 0;
   flex: 1;
