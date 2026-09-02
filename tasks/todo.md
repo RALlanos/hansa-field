@@ -47,14 +47,14 @@
 
 **Acceptance criteria:**
 
-- [ ] Migración nueva y reversión controlada funcionan en una base de prueba.
-- [ ] UUID y geometrías Point/LineString/Polygon se validan y persisten.
-- [ ] Existen índices espaciales y restricciones esenciales.
+- [x] Migración nueva y reversión controlada funcionan en una base de prueba.
+- [x] UUID y geometrías Point/LineString/Polygon se validan y persisten.
+- [x] Existen índices espaciales y restricciones esenciales.
 
 **Verification:**
 
-- [ ] Pruebas de integración contra PostGIS real.
-- [ ] Migraciones aplican desde una base vacía.
+- [x] Pruebas de integración contra PostGIS real.
+- [x] Migraciones aplican desde una base vacía.
 
 **Dependencies:** Task 2
 
