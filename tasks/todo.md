@@ -107,7 +107,7 @@
 
 **Acceptance criteria:**
 
-- [x] Tipos de campo base y media se agregan y nombran desde paleta; se puede arrastrar o usar el botón accesible de añadir.
+- [x] Tipos de campo base y media se agregan y nombran desde paleta; se puede arrastrar o usar el botón accesible de añadir. La reordenación entre campos queda para el siguiente incremento.
 - [x] Guardar conserva una versión de esquema.
 - [x] La configuración futura de permisos y Proyecto tiene puntos de extensión explícitos: App estable, versión inmutable y clave de atributo estable.
 
