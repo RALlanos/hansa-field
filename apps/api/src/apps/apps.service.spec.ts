@@ -31,22 +31,43 @@ describe("AppsService", () => {
   });
 
   it("creates the next immutable schema version for an App", async () => {
-    const query = vi
-      .fn()
-      .mockResolvedValue({
-        rows: [
-          {
-            id: "version-id",
-            version: 1,
-            schema_definition: { sections: [] },
-            created_at: new Date("2026-09-02T00:00:00.000Z"),
-          },
-        ],
-      });
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "version-id",
+          version: 1,
+          schema_definition: { sections: [] },
+          created_at: new Date("2026-09-02T00:00:00.000Z"),
+        },
+      ],
+    });
     const service = new AppsService({ query } as never);
 
     await expect(
       service.createVersion("app-id", { sections: [] }),
     ).resolves.toMatchObject({ version: 1, schema: { sections: [] } });
+  });
+
+  it("returns the newest saved schema version", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "version-id",
+          version: 3,
+          schema_definition: { sections: [] },
+          created_at: new Date("2026-09-02T00:00:00.000Z"),
+        },
+      ],
+    });
+    const service = new AppsService({ query } as never);
+
+    await expect(service.latestVersion("app-id")).resolves.toMatchObject({
+      version: 3,
+      schema: { sections: [] },
+    });
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("ORDER BY version DESC"),
+      ["app-id"],
+    );
   });
 });

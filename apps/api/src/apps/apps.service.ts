@@ -1,4 +1,9 @@
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 
 import {
   DatabaseService,
@@ -61,6 +66,22 @@ export class AppsService {
     return result.rows.map(mapRow);
   }
 
+  async get(appId: string): Promise<AppSummary> {
+    const result = await this.database.query<AppRow>(
+      `SELECT id, code, name, allowed_geometries, created_at
+       FROM app_definitions WHERE id = $1`,
+      [appId],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new NotFoundException({
+        code: "APP_NOT_FOUND",
+        message: "La App solicitada no existe.",
+      });
+    }
+    return mapRow(row);
+  }
+
   async create(input: CreateAppInput): Promise<AppSummary> {
     try {
       const result = await this.database.query<AppRow>(
@@ -102,6 +123,28 @@ export class AppsService {
     );
     const row = result.rows[0];
     if (!row) throw new Error("Database did not return the App version.");
+    return {
+      id: row.id,
+      version: row.version,
+      schema: row.schema_definition,
+      createdAt: row.created_at.toISOString(),
+    };
+  }
+
+  async latestVersion(appId: string): Promise<AppVersion | null> {
+    const result = await this.database.query<{
+      id: string;
+      version: number;
+      schema_definition: AppSchema;
+      created_at: Date;
+    }>(
+      `SELECT id, version, schema_definition, created_at
+       FROM app_versions WHERE app_id = $1
+       ORDER BY version DESC LIMIT 1`,
+      [appId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
     return {
       id: row.id,
       version: row.version,

@@ -105,6 +105,8 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 15:36:39 UTC-04:00 | API de Apps disponible contra PostGIS.                                                         | `GET /api/apps` respondió `200` y lista vacía desde la API local; no se insertaron datos de muestra en la base del usuario.                                          |
 
 | 2026-09-02 16:01 UTC-04:00 | Inicio del constructor versionado de Apps. | Cada esquema se almacena como una nueva versión inmutable en `app_versions`; así los registros históricos podrán conservar el formulario que les corresponde. |
+| 2026-09-02 16:06 UTC-04:00 | El catálogo de Apps pasa a abrir un constructor funcional. | Se implementará el patrón de Fulcrum adaptado a Hansa: paleta de campos a la izquierda, formulario central y propiedades a la derecha; arrastrar tendrá alternativa mediante botón para conservar accesibilidad. |
+| 2026-09-02 16:10 UTC-04:00 | Constructor funcional de Apps. | El catálogo enlaza la App real; se cargan su definición y última versión. La paleta permite arrastrar o añadir campos, secciones y propiedades; guardar crea una versión inmutable mediante API. |
 
 ## Cierre de la entrega
 

@@ -56,6 +56,10 @@ const appSchemaSchema = z
                   "signature",
                 ]),
                 required: z.boolean().default(false),
+                options: z
+                  .array(z.string().trim().min(1).max(120))
+                  .max(100)
+                  .optional(),
               })
               .strict(),
           ),
@@ -72,6 +76,16 @@ export class AppsController {
   @Get()
   async list(): Promise<{ data: AppSummary[] }> {
     return { data: await this.appsService.list() };
+  }
+
+  @Get(":appId/versions/latest")
+  async latestVersion(@Param("appId") appId: string) {
+    return this.appsService.latestVersion(appId);
+  }
+
+  @Get(":appId")
+  async get(@Param("appId") appId: string): Promise<AppSummary> {
+    return this.appsService.get(appId);
   }
 
   @Post()

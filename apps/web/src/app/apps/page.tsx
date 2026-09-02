@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 
 type AppSummary = {
   id: string;
@@ -115,9 +116,12 @@ export default function AppsPage() {
                   {app.allowedGeometries.join(", ")}
                 </p>
               </div>
-              <button className="secondary-button" type="button">
+              <Link
+                className="secondary-button app-configure-link"
+                href={`/apps/${app.id}`}
+              >
                 Configurar App
-              </button>
+              </Link>
             </article>
           ))
         )}

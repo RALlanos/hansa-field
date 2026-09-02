@@ -12,3 +12,4 @@ Todos los cambios relevantes para usuarios y operadores se documentarán aquí.
 - PostgreSQL 17/PostGIS 3.6.4 con migraciones reversibles para Apps, versiones y registros geoespaciales con UUID.
 - Espacio inicial de Registros con navegación de usuario maestro, filtros, capas, mapa visual y tabla de muestra bajo la identidad Hansa Field.
 - API inicial de Apps para crear y listar definiciones geoespaciales con validación de entrada y código único.
+- Constructor de Apps inspirado en el flujo de Fulcrum: paleta de campos, secciones, edición de propiedades y guardado de versiones inmutables.

@@ -91,8 +91,8 @@
 
 **Acceptance criteria:**
 
-- [ ] El usuario maestro crea y ve Apps sin datos de muestra.
-- [ ] Cada App ofrece acceso a constructor y registros.
+- [x] El usuario maestro crea y ve Apps sin datos de muestra.
+- [x] Cada App ofrece acceso al constructor; Registros continúa en el siguiente incremento.
 
 **Verification:**
 
@@ -107,9 +107,9 @@
 
 **Acceptance criteria:**
 
-- [ ] Tipos de campo base y media se agregan, nombran y ordenan.
-- [ ] Guardar conserva una versión de esquema.
-- [ ] La configuración futura de permisos y Proyecto tiene puntos de extensión explícitos.
+- [x] Tipos de campo base y media se agregan y nombran desde paleta; se puede arrastrar o usar el botón accesible de añadir.
+- [x] Guardar conserva una versión de esquema.
+- [x] La configuración futura de permisos y Proyecto tiene puntos de extensión explícitos: App estable, versión inmutable y clave de atributo estable.
 
 **Dependencies:** Task 4a
 

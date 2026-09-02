@@ -50,3 +50,19 @@ Errores:
 - `409 APP_CODE_CONFLICT`: el código ya existe.
 
 No se aceptan campos adicionales en este contrato.
+
+## `GET /api/apps/:appId`
+
+Obtiene la definición base de una App para abrir su constructor. Devuelve `404 APP_NOT_FOUND` si no existe.
+
+## `GET /api/apps/:appId/versions/latest`
+
+Obtiene la última versión guardada del formulario o `null` si la App aún no fue configurada.
+
+## `POST /api/apps/:appId/versions`
+
+Guarda una nueva versión inmutable del formulario. El cuerpo contiene `sections`; cada sección tiene UUID, título y campos. Un campo define UUID, `key` estable en minúsculas con guion bajo, etiqueta, tipo, obligatoriedad y, cuando aplique, opciones.
+
+Los tipos disponibles son: `shortText`, `longText`, `number`, `boolean`, `date`, `time`, `singleChoice`, `multipleChoice`, `photo`, `file` y `signature`.
+
+La primera versión es `1`; guardar nuevamente crea la siguiente. Los registros futuros referenciarán la versión con la que fueron creados.
