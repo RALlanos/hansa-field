@@ -4,16 +4,15 @@ import { describe, expect, it } from "vitest";
 import HomePage from "./page";
 
 describe("HomePage", () => {
-  it("presents the product and the first available workspace", () => {
+  it("opens the master record workspace", () => {
     render(<HomePage />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Hansa Field" }),
+      screen.getByRole("heading", { level: 1, name: "Registros" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ir a Apps" })).toHaveAttribute(
-      "href",
-      "/apps",
-    );
-    expect(screen.getByText("Proyectos")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Nuevo registro" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Usuario maestro")).toBeInTheDocument();
   });
 });
