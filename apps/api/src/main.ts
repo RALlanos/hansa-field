@@ -23,7 +23,7 @@ async function bootstrap(): Promise<void> {
 
   application.enableCors({
     origin: environment.WEB_ORIGIN,
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PATCH"],
   });
   application.setGlobalPrefix("api");
   await application.listen(environment.API_PORT, "127.0.0.1");

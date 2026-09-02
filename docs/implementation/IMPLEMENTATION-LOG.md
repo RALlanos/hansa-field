@@ -92,6 +92,7 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 15:35 UTC-04:00    | El primer ajuste del comando API no pudo iniciar.                   | `tsx` interpretó `watch` como archivo al recibir `--env-file` antes del subcomando.                                                                                   | Se corrigió el orden de argumentos a `tsx watch --env-file=…`; se reiniciará y verificará el servicio.                                        |
 | 2026-09-02 15:36 UTC-04:00    | `GET /api/apps` continuó devolviendo 500 tras cargar configuración. | `AppsController` no recibió `AppsService` en desarrollo por la metadata implícita de decoradores de `tsx`; la base aún no fue consultada.                             | Se declara el token de `AppsService` de forma explícita y se añade una prueba enfocada antes de repetir la consulta HTTP.                     |
 | 2026-09-02 16:08 UTC-04:00    | La primera verificación de tipos del constructor falló.             | El estado temporal del campo creado dentro del actualizador de React era inferido como `never` al leerse después del actualizador.                                    | El campo se construye antes de actualizar el estado; pruebas, tipos y compilación posteriores fueron correctas.                               |
+| 2026-09-02 16:22 UTC-04:00    | La migración de ajustes de App no inició en local.                  | El comando de migración no cargaba `DATABASE_URL` desde la configuración de desarrollo. La API nueva consultó columnas que aún no existían y respondió 500.           | Se carga el archivo de entorno explícitamente en migración, se aplica el cambio y se repite la comprobación HTTP.                             |
 
 ## Avances verificados
 
@@ -108,6 +109,8 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 16:01 UTC-04:00 | Inicio del constructor versionado de Apps. | Cada esquema se almacena como una nueva versión inmutable en `app_versions`; así los registros históricos podrán conservar el formulario que les corresponde. |
 | 2026-09-02 16:06 UTC-04:00 | El catálogo de Apps pasa a abrir un constructor funcional. | Se implementará el patrón de Fulcrum adaptado a Hansa: paleta de campos a la izquierda, formulario central y propiedades a la derecha; arrastrar tendrá alternativa mediante botón para conservar accesibilidad. |
 | 2026-09-02 16:10 UTC-04:00 | Constructor funcional de Apps. | El catálogo enlaza la App real; se cargan su definición y última versión. La paleta permite arrastrar o añadir campos, secciones y propiedades; guardar crea una versión inmutable mediante API. |
+| 2026-09-02 16:14 UTC-04:00 | Corrección de modelo del constructor. | Se separarán los ajustes globales de la App de las propiedades de un campo. El tipo será inmutable después de crearlo; las reglas de visibilidad se guardarán como lógica booleana del campo. |
+| 2026-09-02 16:24 UTC-04:00 | Ajustes y reglas del constructor separados. | La App tiene descripción, icono y color persistentes. Un atributo abre su editor propio, conserva tipo fijo y admite condiciones `all`/`any`, operadores y conservación opcional del valor al ocultarse. |
 
 ## Cierre de la entrega
 

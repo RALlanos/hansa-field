@@ -296,6 +296,59 @@ body {
   align-items: center;
   gap: 0.45rem;
 }
+.field-editor,
+.rules-dialog {
+  width: min(100%, 32rem);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 1rem 3rem #0004;
+}
+.field-editor label,
+.rules-dialog label {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.8rem;
+  color: #40505e;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.field-editor input:not([type="checkbox"]),
+.field-editor select,
+.field-editor textarea,
+.rules-dialog input,
+.rules-dialog select {
+  width: 100%;
+  padding: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  font: inherit;
+}
+.field-editor textarea {
+  min-height: 4rem;
+  resize: vertical;
+}
+.field-editor .checkbox-label,
+.rules-dialog .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.rules-dialog h2,
+.rules-dialog p {
+  margin-top: 0;
+}
+.rule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.rule-row input {
+  grid-column: 1 / -1;
+}
 @media (max-width: 58rem) {
   .builder-grid {
     grid-template-columns: 12rem minmax(20rem, 1fr);

@@ -23,6 +23,18 @@ type BuilderField = {
   type: FieldType;
   required: boolean;
   options?: string[];
+  description?: string;
+  display?: "inline" | "fullWidth";
+  hidden?: boolean;
+  visibility?: {
+    match: "all" | "any";
+    preserveValue: boolean;
+    conditions: Array<{
+      fieldId: string;
+      operator: "equals" | "notEquals" | "isEmpty" | "isNotEmpty";
+      value?: string;
+    }>;
+  };
 };
 type BuilderSection = { id: string; title: string; fields: BuilderField[] };
 type AppSchema = { sections: BuilderSection[] };
@@ -31,6 +43,9 @@ type AppSummary = {
   code: string;
   name: string;
   allowedGeometries: string[];
+  description: string;
+  mapIcon: "pin" | "post" | "cable" | "node" | "building";
+  mapColor: string;
 };
 type AppVersion = { version: number; schema: AppSchema };
 
@@ -92,6 +107,9 @@ export default function AppBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [editingField, setEditingField] = useState(false);
+  const [editingRules, setEditingRules] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -170,6 +188,7 @@ export default function AppBuilderPage() {
       return { sections };
     });
     setSelectedId(field.id);
+    setEditingField(true);
   }
 
   function addSection() {
@@ -212,6 +231,35 @@ export default function AppBuilderPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveSettings() {
+    if (!app) return;
+    setSavingSettings(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/apps/${appId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          description: app.description,
+          mapIcon: app.mapIcon,
+          mapColor: app.mapColor,
+        }),
+      });
+      if (!response.ok)
+        throw new Error("No se pudieron guardar los ajustes de la App.");
+      setApp((await response.json()) as AppSummary);
+      setMessage("Ajustes globales de la App guardados.");
+    } catch (reason: unknown) {
+      setMessage(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudieron guardar los ajustes.",
+      );
+    } finally {
+      setSavingSettings(false);
     }
   }
 
@@ -335,10 +383,23 @@ export default function AppBuilderPage() {
                     <button
                       className={`builder-field ${field.id === selectedId ? "selected" : ""}`}
                       key={field.id}
-                      onClick={() => setSelectedId(field.id)}
+                      onClick={() => {
+                        setSelectedId(field.id);
+                        setEditingField(true);
+                      }}
                       type="button"
                     >
-                      <span aria-hidden="true">⋮⋮</span>
+                      <span aria-hidden="true">
+                        {field.type === "number"
+                          ? "123"
+                          : field.type === "boolean"
+                            ? "☑"
+                            : field.type === "date"
+                              ? "▣"
+                              : field.type === "photo"
+                                ? "◉"
+                                : "abc"}
+                      </span>
                       <strong>{field.label}</strong>
                       <small>
                         {
@@ -355,84 +416,339 @@ export default function AppBuilderPage() {
             ))
           )}
         </section>
-        <aside
-          className="builder-properties"
-          aria-label="Propiedades del campo"
-        >
-          <h2>Propiedades</h2>
-          {!selected ? (
-            <p>Selecciona un campo del formulario para configurarlo.</p>
-          ) : (
-            <div className="properties-form">
+        <aside className="builder-properties" aria-label="Ajustes de la App">
+          <h2>Ajustes de la App</h2>
+          <div className="properties-form">
+            <label>
+              Descripción
+              <textarea
+                value={app.description}
+                onChange={(event) =>
+                  setApp({ ...app, description: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Icono del mapa
+              <select
+                value={app.mapIcon}
+                onChange={(event) =>
+                  setApp({
+                    ...app,
+                    mapIcon: event.target.value as AppSummary["mapIcon"],
+                  })
+                }
+              >
+                <option value="pin">Pin</option>
+                <option value="post">Poste</option>
+                <option value="cable">Cable</option>
+                <option value="node">Nodo</option>
+                <option value="building">Edificio</option>
+              </select>
+            </label>
+            <label>
+              Color de la capa
+              <input
+                type="color"
+                value={app.mapColor}
+                onChange={(event) =>
+                  setApp({ ...app, mapColor: event.target.value })
+                }
+              />
+            </label>
+            <p>
+              Estos ajustes pertenecen a toda la App, no a un atributo
+              individual.
+            </p>
+            <button
+              className="secondary-button"
+              disabled={savingSettings}
+              onClick={saveSettings}
+              type="button"
+            >
+              {savingSettings ? "Guardando…" : "Guardar ajustes"}
+            </button>
+          </div>
+        </aside>
+      </div>
+      {selected && editingField && (
+        <div className="modal-backdrop">
+          <section
+            aria-label="Propiedades del campo"
+            className="field-editor"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="form-heading">
+              <h2>{selected.label}</h2>
+              <button
+                aria-label="Cerrar propiedades"
+                className="icon-button"
+                onClick={() => setEditingField(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <label>
+              Etiqueta
+              <input
+                value={selected.label}
+                onChange={(event) =>
+                  mutateField(selected.id, { label: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Descripción
+              <textarea
+                value={selected.description ?? ""}
+                onChange={(event) =>
+                  mutateField(selected.id, { description: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Nombre del atributo
+              <input
+                pattern="[a-z][a-z0-9_]{0,63}"
+                value={selected.key}
+                onChange={(event) =>
+                  mutateField(selected.id, {
+                    key: identifier(event.target.value),
+                  })
+                }
+              />
+            </label>
+            <p>
+              <strong>Tipo fijo:</strong>{" "}
+              {palette.find((item) => item.type === selected.type)?.label}. Para
+              usar otro tipo, crea un nuevo atributo.
+            </p>
+            {(selected.type === "singleChoice" ||
+              selected.type === "multipleChoice") && (
               <label>
-                Etiqueta
-                <input
-                  value={selected.label}
-                  onChange={(event) =>
-                    mutateField(selected.id, { label: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Nombre del atributo
-                <input
-                  pattern="[a-z][a-z0-9_]{0,63}"
-                  value={selected.key}
+                Opciones (una por línea)
+                <textarea
+                  value={(selected.options ?? []).join("\n")}
                   onChange={(event) =>
                     mutateField(selected.id, {
-                      key: identifier(event.target.value),
+                      options: event.target.value
+                        .split("\n")
+                        .map((item) => item.trim())
+                        .filter(Boolean),
                     })
                   }
                 />
               </label>
-              <label>
-                Tipo de campo
+            )}
+            <label>
+              Mostrar
+              <select
+                value={selected.display ?? "fullWidth"}
+                onChange={(event) =>
+                  mutateField(selected.id, {
+                    display: event.target.value as "inline" | "fullWidth",
+                  })
+                }
+              >
+                <option value="fullWidth">Ancho completo</option>
+                <option value="inline">En línea</option>
+              </select>
+            </label>
+            <label className="checkbox-label">
+              <input
+                checked={selected.required}
+                onChange={(event) =>
+                  mutateField(selected.id, { required: event.target.checked })
+                }
+                type="checkbox"
+              />
+              Campo obligatorio
+            </label>
+            <label className="checkbox-label">
+              <input
+                checked={selected.hidden ?? false}
+                onChange={(event) =>
+                  mutateField(selected.id, { hidden: event.target.checked })
+                }
+                type="checkbox"
+              />
+              Oculto por defecto
+            </label>
+            <button
+              className="secondary-button"
+              onClick={() => setEditingRules(true)}
+              type="button"
+            >
+              Reglas de visibilidad{" "}
+              {selected.visibility
+                ? `(${selected.visibility.conditions.length})`
+                : ""}
+            </button>
+          </section>
+        </div>
+      )}
+      {selected && editingRules && (
+        <div className="modal-backdrop">
+          <section
+            aria-label="Reglas de visibilidad"
+            className="rules-dialog"
+            role="dialog"
+            aria-modal="true"
+          >
+            <h2>Reglas de visibilidad</h2>
+            <p>
+              Determinan si se muestra este atributo sin cambiar ni duplicar el
+              formulario.
+            </p>
+            <label>
+              Mostrar cuando
+              <select
+                value={selected.visibility?.match ?? "all"}
+                onChange={(event) =>
+                  mutateField(selected.id, {
+                    visibility: {
+                      match: event.target.value as "all" | "any",
+                      preserveValue:
+                        selected.visibility?.preserveValue ?? false,
+                      conditions: selected.visibility?.conditions ?? [],
+                    },
+                  })
+                }
+              >
+                <option value="all">se cumplan todas las condiciones</option>
+                <option value="any">se cumpla alguna condición</option>
+              </select>
+            </label>
+            {(selected.visibility?.conditions ?? []).map((condition, index) => (
+              <div className="rule-row" key={`${condition.fieldId}-${index}`}>
                 <select
-                  value={selected.type}
+                  value={condition.fieldId}
                   onChange={(event) =>
                     mutateField(selected.id, {
-                      type: event.target.value as FieldType,
+                      visibility: {
+                        ...selected.visibility!,
+                        conditions: selected.visibility!.conditions.map(
+                          (item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, fieldId: event.target.value }
+                              : item,
+                        ),
+                      },
                     })
                   }
                 >
-                  {palette.map((item) => (
-                    <option key={item.type} value={item.type}>
-                      {item.label}
-                    </option>
-                  ))}
+                  {schema.sections
+                    .flatMap((section) => section.fields)
+                    .filter((field) => field.id !== selected.id)
+                    .map((field) => (
+                      <option key={field.id} value={field.id}>
+                        {field.label}
+                      </option>
+                    ))}
                 </select>
-              </label>
-              {(selected.type === "singleChoice" ||
-                selected.type === "multipleChoice") && (
-                <label>
-                  Opciones (una por línea)
-                  <textarea
-                    value={(selected.options ?? []).join("\n")}
-                    onChange={(event) =>
-                      mutateField(selected.id, {
-                        options: event.target.value
-                          .split("\n")
-                          .map((item) => item.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                </label>
-              )}
-              <label className="checkbox-label">
-                <input
-                  checked={selected.required}
+                <select
+                  value={condition.operator}
                   onChange={(event) =>
-                    mutateField(selected.id, { required: event.target.checked })
+                    mutateField(selected.id, {
+                      visibility: {
+                        ...selected.visibility!,
+                        conditions: selected.visibility!.conditions.map(
+                          (item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  operator: event.target
+                                    .value as typeof item.operator,
+                                }
+                              : item,
+                        ),
+                      },
+                    })
                   }
-                  type="checkbox"
-                />
-                Campo obligatorio
-              </label>
+                >
+                  <option value="equals">es igual a</option>
+                  <option value="notEquals">no es igual a</option>
+                  <option value="isEmpty">está vacío</option>
+                  <option value="isNotEmpty">no está vacío</option>
+                </select>
+                {condition.operator !== "isEmpty" &&
+                  condition.operator !== "isNotEmpty" && (
+                    <input
+                      aria-label="Valor de la condición"
+                      value={condition.value ?? ""}
+                      onChange={(event) =>
+                        mutateField(selected.id, {
+                          visibility: {
+                            ...selected.visibility!,
+                            conditions: selected.visibility!.conditions.map(
+                              (item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, value: event.target.value }
+                                  : item,
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  )}
+              </div>
+            ))}
+            <button
+              className="secondary-button"
+              disabled={
+                schema.sections.flatMap((section) => section.fields).length < 2
+              }
+              onClick={() => {
+                const source = schema.sections
+                  .flatMap((section) => section.fields)
+                  .find((field) => field.id !== selected.id);
+                if (source)
+                  mutateField(selected.id, {
+                    visibility: {
+                      match: selected.visibility?.match ?? "all",
+                      preserveValue:
+                        selected.visibility?.preserveValue ?? false,
+                      conditions: [
+                        ...(selected.visibility?.conditions ?? []),
+                        { fieldId: source.id, operator: "equals", value: "" },
+                      ],
+                    },
+                  });
+              }}
+              type="button"
+            >
+              + Añadir condición
+            </button>
+            <label className="checkbox-label">
+              <input
+                checked={selected.visibility?.preserveValue ?? false}
+                onChange={(event) =>
+                  mutateField(selected.id, {
+                    visibility: {
+                      match: selected.visibility?.match ?? "all",
+                      conditions: selected.visibility?.conditions ?? [],
+                      preserveValue: event.target.checked,
+                    },
+                  })
+                }
+                type="checkbox"
+              />
+              Conservar valor cuando quede oculto
+            </label>
+            <div className="form-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setEditingRules(false)}
+                type="button"
+              >
+                Listo
+              </button>
             </div>
-          )}
-        </aside>
-      </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

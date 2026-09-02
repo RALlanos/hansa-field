@@ -70,4 +70,30 @@ describe("AppsService", () => {
       ["app-id"],
     );
   });
+
+  it("updates the global visual settings of an App", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "app-id",
+          code: "POSTES",
+          name: "Postes",
+          allowed_geometries: ["Point"],
+          description: "Inventario de postes",
+          map_icon: "post",
+          map_color: "#77c717",
+          created_at: new Date("2026-09-02T00:00:00.000Z"),
+        },
+      ],
+    });
+    const service = new AppsService({ query } as never);
+
+    await expect(
+      service.updateSettings("app-id", {
+        description: "Inventario de postes",
+        mapIcon: "post",
+        mapColor: "#77c717",
+      }),
+    ).resolves.toMatchObject({ mapIcon: "post", mapColor: "#77c717" });
+  });
 });

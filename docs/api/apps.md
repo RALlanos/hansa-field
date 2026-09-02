@@ -66,3 +66,7 @@ Guarda una nueva versión inmutable del formulario. El cuerpo contiene `sections
 Los tipos disponibles son: `shortText`, `longText`, `number`, `boolean`, `date`, `time`, `singleChoice`, `multipleChoice`, `photo`, `file` y `signature`.
 
 La primera versión es `1`; guardar nuevamente crea la siguiente. Los registros futuros referenciarán la versión con la que fueron creados.
+
+## `PATCH /api/apps/:appId`
+
+Actualiza únicamente los ajustes globales visuales: `description`, `mapIcon` (`pin`, `post`, `cable`, `node`, `building`) y `mapColor` hexadecimal. No modifica ni convierte atributos ya creados.

@@ -23,7 +23,15 @@ export type AppSummary = Readonly<{
   code: string;
   name: string;
   allowedGeometries: AllowedGeometry[];
+  description: string;
+  mapIcon: "pin" | "post" | "cable" | "node" | "building";
+  mapColor: string;
   createdAt: string;
+}>;
+export type UpdateAppSettingsInput = Readonly<{
+  description: string;
+  mapIcon: AppSummary["mapIcon"];
+  mapColor: string;
 }>;
 
 export type AppSchema = Readonly<{ sections: unknown[] }>;
@@ -39,6 +47,9 @@ type AppRow = Readonly<{
   code: string;
   name: string;
   allowed_geometries: AllowedGeometry[];
+  description: string;
+  map_icon: AppSummary["mapIcon"];
+  map_color: string;
   created_at: Date;
 }>;
 
@@ -48,6 +59,9 @@ function mapRow(row: AppRow): AppSummary {
     code: row.code,
     name: row.name,
     allowedGeometries: row.allowed_geometries,
+    description: row.description,
+    mapIcon: row.map_icon,
+    mapColor: row.map_color,
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -60,7 +74,7 @@ export class AppsService {
 
   async list(): Promise<AppSummary[]> {
     const result = await this.database.query<AppRow>(`
-      SELECT id, code, name, allowed_geometries, created_at
+      SELECT id, code, name, allowed_geometries, description, map_icon, map_color, created_at
       FROM app_definitions ORDER BY name ASC
     `);
     return result.rows.map(mapRow);
@@ -68,7 +82,7 @@ export class AppsService {
 
   async get(appId: string): Promise<AppSummary> {
     const result = await this.database.query<AppRow>(
-      `SELECT id, code, name, allowed_geometries, created_at
+      `SELECT id, code, name, allowed_geometries, description, map_icon, map_color, created_at
        FROM app_definitions WHERE id = $1`,
       [appId],
     );
@@ -87,7 +101,7 @@ export class AppsService {
       const result = await this.database.query<AppRow>(
         `INSERT INTO app_definitions (code, name, allowed_geometries)
          VALUES ($1, $2, $3)
-         RETURNING id, code, name, allowed_geometries, created_at`,
+         RETURNING id, code, name, allowed_geometries, description, map_icon, map_color, created_at`,
         [input.code, input.name, input.allowedGeometries],
       );
       const row = result.rows[0];
@@ -107,6 +121,27 @@ export class AppsService {
       }
       throw error;
     }
+  }
+
+  async updateSettings(
+    appId: string,
+    input: UpdateAppSettingsInput,
+  ): Promise<AppSummary> {
+    const result = await this.database.query<AppRow>(
+      `UPDATE app_definitions
+       SET description = $2, map_icon = $3, map_color = $4, updated_at = now()
+       WHERE id = $1
+       RETURNING id, code, name, allowed_geometries, description, map_icon, map_color, created_at`,
+      [appId, input.description, input.mapIcon, input.mapColor],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new NotFoundException({
+        code: "APP_NOT_FOUND",
+        message: "La App solicitada no existe.",
+      });
+    }
+    return mapRow(row);
   }
 
   async createVersion(appId: string, schema: AppSchema): Promise<AppVersion> {

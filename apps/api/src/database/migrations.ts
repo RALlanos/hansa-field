@@ -60,4 +60,25 @@ export const migrations: readonly Migration[] = [
       DROP TABLE IF EXISTS app_definitions;
     `,
   },
+  {
+    id: "0002_app_visual_settings",
+    up: `
+      ALTER TABLE app_definitions
+        ADD COLUMN description text NOT NULL DEFAULT '',
+        ADD COLUMN map_icon text NOT NULL DEFAULT 'pin',
+        ADD COLUMN map_color text NOT NULL DEFAULT '#b12029',
+        ADD CONSTRAINT app_definitions_map_icon_check
+          CHECK (map_icon IN ('pin', 'post', 'cable', 'node', 'building')),
+        ADD CONSTRAINT app_definitions_map_color_check
+          CHECK (map_color ~ '^#[0-9A-Fa-f]{6}$');
+    `,
+    down: `
+      ALTER TABLE app_definitions
+        DROP CONSTRAINT IF EXISTS app_definitions_map_color_check,
+        DROP CONSTRAINT IF EXISTS app_definitions_map_icon_check,
+        DROP COLUMN IF EXISTS map_color,
+        DROP COLUMN IF EXISTS map_icon,
+        DROP COLUMN IF EXISTS description;
+    `,
+  },
 ];
