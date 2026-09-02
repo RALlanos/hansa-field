@@ -99,9 +99,16 @@ export class AppsService {
   async create(input: CreateAppInput): Promise<AppSummary> {
     try {
       const result = await this.database.query<AppRow>(
-        `INSERT INTO app_definitions (code, name, allowed_geometries)
-         VALUES ($1, $2, $3)
-         RETURNING id, code, name, allowed_geometries, description, map_icon, map_color, created_at`,
+        `WITH created_app AS (
+           INSERT INTO app_definitions (code, name, allowed_geometries)
+           VALUES ($1, $2, $3)
+           RETURNING id, code, name, allowed_geometries, description, map_icon, map_color, created_at
+         ), created_version AS (
+           INSERT INTO app_versions (app_id, version, schema_definition)
+           SELECT id, 1, '{"sections": []}'::jsonb FROM created_app
+         )
+         SELECT id, code, name, allowed_geometries, description, map_icon, map_color, created_at
+         FROM created_app`,
         [input.code, input.name, input.allowedGeometries],
       );
       const row = result.rows[0];

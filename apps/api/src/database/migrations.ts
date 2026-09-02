@@ -111,4 +111,23 @@ export const migrations: readonly Migration[] = [
       DROP TABLE IF EXISTS projects;
     `,
   },
+  {
+    id: "0005_initial_app_versions",
+    up: `
+      INSERT INTO app_versions (app_id, version, schema_definition)
+      SELECT app.id, 1, '{"sections": []}'::jsonb
+      FROM app_definitions app
+      WHERE NOT EXISTS (
+        SELECT 1 FROM app_versions version WHERE version.app_id = app.id
+      );
+    `,
+    down: `
+      DELETE FROM app_versions version
+      WHERE version.version = 1
+        AND version.schema_definition = '{"sections": []}'::jsonb
+        AND NOT EXISTS (
+          SELECT 1 FROM records record WHERE record.app_version_id = version.id
+        );
+    `,
+  },
 ];
