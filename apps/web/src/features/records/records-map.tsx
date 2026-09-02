@@ -3,7 +3,12 @@
 import "leaflet/dist/leaflet.css";
 
 import { useEffect, useRef, useState } from "react";
-import type { GeoJSON, Map as LeafletMap } from "leaflet";
+import type {
+  CircleMarker,
+  GeoJSON,
+  LeafletMouseEvent,
+  Map as LeafletMap,
+} from "leaflet";
 import type { FeatureCollection } from "geojson";
 
 export type RecordGeometry =
@@ -21,6 +26,9 @@ type Props = {
   appId: string;
   color: string;
   records: MapRecord[];
+  pickedPoint: [number, number] | null;
+  picking: boolean;
+  onPick: (coordinates: [number, number]) => void;
   onRecords: (records: MapRecord[]) => void;
   onSelect: (record: MapRecord) => void;
 };
@@ -31,6 +39,9 @@ export function RecordsMap({
   appId,
   color,
   records,
+  pickedPoint,
+  picking,
+  onPick,
   onRecords,
   onSelect,
 }: Props) {
@@ -39,11 +50,19 @@ export function RecordsMap({
   const layer = useRef<GeoJSON | null>(null);
   const recordsRef = useRef(records);
   const fitted = useRef(false);
+  const pickedMarker = useRef<CircleMarker | null>(null);
+  const pickingRef = useRef(picking);
+  const onPickRef = useRef(onPick);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     recordsRef.current = records;
   }, [records]);
+
+  useEffect(() => {
+    pickingRef.current = picking;
+    onPickRef.current = onPick;
+  }, [onPick, picking]);
 
   useEffect(() => {
     if (!container.current || map.current) return;
@@ -79,6 +98,11 @@ export function RecordsMap({
         }
       };
       instance.on("moveend", loadVisible);
+      instance.on("click", (event: LeafletMouseEvent) => {
+        if (pickingRef.current) {
+          onPickRef.current([event.latlng.lng, event.latlng.lat]);
+        }
+      });
       map.current = instance;
       setInitialized(true);
       window.setTimeout(() => instance.invalidateSize(), 0);
@@ -142,5 +166,34 @@ export function RecordsMap({
     };
   }, [color, initialized, onSelect, records]);
 
-  return <div className="leaflet-records-map" ref={container} />;
+  useEffect(() => {
+    if (!map.current || !initialized) return;
+    let active = true;
+    void import("leaflet").then((leaflet) => {
+      if (!active || !map.current) return;
+      pickedMarker.current?.remove();
+      pickedMarker.current = null;
+      if (!pickedPoint) return;
+      pickedMarker.current = leaflet
+        .circleMarker([pickedPoint[1], pickedPoint[0]], {
+          radius: 9,
+          color: "#ffffff",
+          weight: 3,
+          fillColor: color,
+          fillOpacity: 1,
+        })
+        .bindTooltip("Ubicación seleccionada")
+        .addTo(map.current);
+    });
+    return () => {
+      active = false;
+    };
+  }, [color, initialized, pickedPoint]);
+
+  return (
+    <div
+      className={`leaflet-records-map ${picking ? "is-picking" : ""}`}
+      ref={container}
+    />
+  );
 }

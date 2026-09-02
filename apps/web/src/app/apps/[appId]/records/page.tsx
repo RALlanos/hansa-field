@@ -16,6 +16,7 @@ type Field = {
   type: string;
   required: boolean;
   options?: string[];
+  description?: string;
   hidden?: boolean;
   visibility?: {
     match: "all" | "any";
@@ -33,16 +34,19 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
 function visible(
   field: Field,
   fields: Field[],
-  values: Record<string, string>,
+  values: Record<string, unknown>,
 ): boolean {
   if (field.hidden) return false;
   const rules = field.visibility;
   if (!rules?.conditions.length) return true;
   const result = rules.conditions.map((condition) => {
     const source = fields.find((item) => item.id === condition.fieldId);
-    const value = source ? (values[source.key] ?? "") : "";
-    if (condition.operator === "isEmpty") return value === "";
-    if (condition.operator === "isNotEmpty") return value !== "";
+    const rawValue = source ? values[source.key] : undefined;
+    const value = Array.isArray(rawValue)
+      ? rawValue.join(",")
+      : String(rawValue ?? "");
+    if (condition.operator === "isEmpty") return value.length === 0;
+    if (condition.operator === "isNotEmpty") return value.length > 0;
     if (condition.operator === "notEquals")
       return value !== (condition.value ?? "");
     return value === (condition.value ?? "");
@@ -57,6 +61,8 @@ export default function RecordsPage() {
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [mode, setMode] = useState<Mode>("split");
   const [editor, setEditor] = useState<RecordItem | "new" | null>(null);
+  const [draftPoint, setDraftPoint] = useState<[number, number] | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -85,6 +91,23 @@ export default function RecordsPage() {
     () => schema.sections.flatMap((section) => section.fields),
     [schema],
   );
+  function openEditor(record: RecordItem | "new") {
+    setEditor(record);
+    setFormValues(record === "new" ? {} : record.attributes);
+    setDraftPoint(
+      record !== "new" && record.geometry?.type === "Point"
+        ? record.geometry.coordinates
+        : null,
+    );
+  }
+  function closeEditor() {
+    setEditor(null);
+    setDraftPoint(null);
+    setFormValues({});
+  }
+  function changeField(key: string, value: unknown) {
+    setFormValues((current) => ({ ...current, [key]: value }));
+  }
   async function saveRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -99,18 +122,9 @@ export default function RecordsPage() {
         return [field.key, value];
       }),
     );
-    const longitude = String(form.get("longitude") ?? "");
-    const latitude = String(form.get("latitude") ?? "");
-    const geometry =
-      longitude !== "" && latitude !== ""
-        ? {
-            type: "Point" as const,
-            coordinates: [Number(longitude), Number(latitude)] as [
-              number,
-              number,
-            ],
-          }
-        : null;
+    const geometry = draftPoint
+      ? { type: "Point" as const, coordinates: draftPoint }
+      : null;
     const isNew = editor === "new";
     const url = isNew
       ? `${apiUrl}/api/apps/${appId}/records`
@@ -128,7 +142,7 @@ export default function RecordsPage() {
           ? [saved, ...current]
           : current.map((item) => (item.id === saved.id ? saved : item)),
       );
-      setEditor(null);
+      closeEditor();
       setMessage(isNew ? "Registro creado." : "Registro actualizado.");
     } catch (reason) {
       setMessage(
@@ -180,8 +194,7 @@ export default function RecordsPage() {
         </div>
         <button
           className="primary-button"
-          disabled={!schema.sections.length}
-          onClick={() => setEditor("new")}
+          onClick={() => openEditor("new")}
           type="button"
         >
           + Nuevo registro
@@ -194,7 +207,8 @@ export default function RecordsPage() {
       )}
       {!schema.sections.length && (
         <p className="records-notice">
-          Configura y guarda al menos un campo antes de crear registros.
+          Esta App todavía no tiene atributos. Puedes crear un punto con
+          ubicación o configurar su formulario antes de continuar.
         </p>
       )}
       <div className={`records-view ${mode}`}>
@@ -202,8 +216,11 @@ export default function RecordsPage() {
           <RecordsMap
             appId={appId}
             color={app.mapColor}
+            onPick={setDraftPoint}
             onRecords={setRecords}
-            onSelect={setEditor}
+            onSelect={openEditor}
+            pickedPoint={draftPoint}
+            picking={editor !== null}
             records={records}
           />
         </section>
@@ -232,7 +249,7 @@ export default function RecordsPage() {
                   <td>
                     <button
                       className="row-action"
-                      onClick={() => setEditor(record)}
+                      onClick={() => openEditor(record)}
                       type="button"
                     >
                       Editar
@@ -250,7 +267,7 @@ export default function RecordsPage() {
         </section>
       </div>
       {editor && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop record-editor-backdrop">
           <form
             aria-label="Editor de registro"
             className="record-editor"
@@ -261,7 +278,7 @@ export default function RecordsPage() {
               <button
                 aria-label="Cerrar"
                 className="icon-button"
-                onClick={() => setEditor(null)}
+                onClick={closeEditor}
                 type="button"
               >
                 ×
@@ -271,28 +288,22 @@ export default function RecordsPage() {
               <fieldset key={section.id}>
                 <legend>{section.title}</legend>
                 {section.fields
-                  .filter((field) =>
-                    visible(
-                      field,
-                      fields,
-                      editor === "new"
-                        ? {}
-                        : Object.fromEntries(
-                            Object.entries(editor.attributes).map(
-                              ([key, value]) => [key, String(value)],
-                            ),
-                          ),
-                    ),
-                  )
+                  .filter((field) => visible(field, fields, formValues))
                   .map((field) => (
                     <label key={field.id}>
-                      {field.label}
+                      <span>
+                        {field.label}
+                        {field.required ? " *" : ""}
+                      </span>
                       {field.type === "boolean" ? (
                         <input
                           defaultChecked={Boolean(
                             editor !== "new" && editor.attributes[field.key],
                           )}
                           name={field.key}
+                          onChange={(event) =>
+                            changeField(field.key, event.target.checked)
+                          }
                           type="checkbox"
                         />
                       ) : field.type === "longText" ? (
@@ -303,6 +314,9 @@ export default function RecordsPage() {
                               : String(editor.attributes[field.key] ?? "")
                           }
                           name={field.key}
+                          onChange={(event) =>
+                            changeField(field.key, event.target.value)
+                          }
                           required={field.required}
                         />
                       ) : field.type === "singleChoice" ? (
@@ -313,9 +327,38 @@ export default function RecordsPage() {
                               : String(editor.attributes[field.key] ?? "")
                           }
                           name={field.key}
+                          onChange={(event) =>
+                            changeField(field.key, event.target.value)
+                          }
                           required={field.required}
                         >
                           <option value="">Selecciona…</option>
+                          {(field.options ?? []).map((option) => (
+                            <option key={option}>{option}</option>
+                          ))}
+                        </select>
+                      ) : field.type === "multipleChoice" ? (
+                        <select
+                          defaultValue={
+                            editor === "new"
+                              ? []
+                              : Array.isArray(editor.attributes[field.key])
+                                ? (editor.attributes[field.key] as string[])
+                                : []
+                          }
+                          multiple
+                          name={field.key}
+                          onChange={(event) =>
+                            changeField(
+                              field.key,
+                              Array.from(
+                                event.currentTarget.selectedOptions,
+                                (option) => option.value,
+                              ),
+                            )
+                          }
+                          required={field.required}
+                        >
                           {(field.options ?? []).map((option) => (
                             <option key={option}>{option}</option>
                           ))}
@@ -328,6 +371,16 @@ export default function RecordsPage() {
                               : String(editor.attributes[field.key] ?? "")
                           }
                           name={field.key}
+                          onChange={(event) =>
+                            changeField(
+                              field.key,
+                              field.type === "number"
+                                ? event.target.value === ""
+                                  ? null
+                                  : Number(event.target.value)
+                                : event.target.value,
+                            )
+                          }
                           required={field.required}
                           type={
                             field.type === "number"
@@ -340,43 +393,58 @@ export default function RecordsPage() {
                           }
                         />
                       )}
+                      {field.description && <small>{field.description}</small>}
                     </label>
                   ))}
               </fieldset>
             ))}
             <fieldset>
-              <legend>Ubicación opcional</legend>
+              <legend>Ubicación del punto</legend>
+              <p className="map-pick-hint">
+                Haz clic en el mapa para ubicar el punto.
+              </p>
               <label>
                 Longitud
                 <input
-                  defaultValue={
-                    editor !== "new" && editor.geometry?.type === "Point"
-                      ? editor.geometry.coordinates[0]
-                      : ""
-                  }
+                  onChange={(event) => {
+                    const longitude = Number(event.target.value);
+                    setDraftPoint((current) => [longitude, current?.[1] ?? 0]);
+                  }}
                   name="longitude"
+                  placeholder="Selecciona en el mapa"
                   step="any"
                   type="number"
+                  value={draftPoint?.[0] ?? ""}
                 />
               </label>
               <label>
                 Latitud
                 <input
-                  defaultValue={
-                    editor !== "new" && editor.geometry?.type === "Point"
-                      ? editor.geometry.coordinates[1]
-                      : ""
-                  }
+                  onChange={(event) => {
+                    const latitude = Number(event.target.value);
+                    setDraftPoint((current) => [current?.[0] ?? 0, latitude]);
+                  }}
                   name="latitude"
+                  placeholder="Selecciona en el mapa"
                   step="any"
                   type="number"
+                  value={draftPoint?.[1] ?? ""}
                 />
               </label>
+              {draftPoint && (
+                <button
+                  className="row-action clear-location"
+                  onClick={() => setDraftPoint(null)}
+                  type="button"
+                >
+                  Quitar ubicación
+                </button>
+              )}
             </fieldset>
             <div className="form-actions">
               <button
                 className="secondary-button"
-                onClick={() => setEditor(null)}
+                onClick={closeEditor}
                 type="button"
               >
                 Cancelar
