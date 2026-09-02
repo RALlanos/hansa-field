@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 const records = [
   [
@@ -62,9 +63,9 @@ export function FieldWorkspace() {
           </button>
         </div>
         <nav aria-label="Principal" className="field-nav">
-          <button className="nav-item active" type="button">
+          <Link className="nav-item active" href="/apps">
             <span aria-hidden="true">▦</span>Apps
-          </button>
+          </Link>
           <button
             aria-expanded={setupOpen}
             className="nav-item setup-toggle"

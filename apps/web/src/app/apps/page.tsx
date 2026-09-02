@@ -122,6 +122,12 @@ export default function AppsPage() {
               >
                 Configurar App
               </Link>
+              <Link
+                className="secondary-button app-configure-link"
+                href={`/apps/${app.id}/records`}
+              >
+                Ver registros
+              </Link>
             </article>
           ))
         )}

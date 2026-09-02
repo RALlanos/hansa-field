@@ -61,11 +61,13 @@ Obtiene la última versión guardada del formulario o `null` si la App aún no f
 
 ## `POST /api/apps/:appId/versions`
 
-Guarda una nueva versión inmutable del formulario. El cuerpo contiene `sections`; cada sección tiene UUID, título y campos. Un campo define UUID, `key` estable en minúsculas con guion bajo, etiqueta, tipo, obligatoriedad y, cuando aplique, opciones.
+Guarda una nueva versión inmutable del formulario. El cuerpo contiene `sections`; cada sección tiene UUID, título, `subtitle` opcional de hasta 240 caracteres y campos. Un campo define UUID, `key` estable en minúsculas con guion bajo, etiqueta, tipo, obligatoriedad y, cuando aplique, opciones.
 
 Los tipos disponibles son: `shortText`, `longText`, `number`, `boolean`, `date`, `time`, `singleChoice`, `multipleChoice`, `photo`, `file` y `signature`.
 
 La primera versión es `1`; guardar nuevamente crea la siguiente. Los registros futuros referenciarán la versión con la que fueron creados.
+
+En el constructor, duplicar o eliminar modifica únicamente el borrador abierto. Eliminar requiere confirmación y nunca reescribe una versión ya publicada ni sus registros.
 
 ## `PATCH /api/apps/:appId`
 

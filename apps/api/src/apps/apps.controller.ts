@@ -38,6 +38,7 @@ const appSchemaSchema = z
         .object({
           id: z.string().uuid(),
           title: z.string().trim().min(1).max(120),
+          subtitle: z.string().trim().max(240).optional(),
           fields: z.array(
             z
               .object({

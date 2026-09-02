@@ -3,41 +3,16 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { DragEvent, useEffect, useMemo, useState } from "react";
-
-type FieldType =
-  | "shortText"
-  | "longText"
-  | "number"
-  | "boolean"
-  | "date"
-  | "time"
-  | "singleChoice"
-  | "multipleChoice"
-  | "photo"
-  | "file"
-  | "signature";
-type BuilderField = {
-  id: string;
-  key: string;
-  label: string;
-  type: FieldType;
-  required: boolean;
-  options?: string[];
-  description?: string;
-  display?: "inline" | "fullWidth";
-  hidden?: boolean;
-  visibility?: {
-    match: "all" | "any";
-    preserveValue: boolean;
-    conditions: Array<{
-      fieldId: string;
-      operator: "equals" | "notEquals" | "isEmpty" | "isNotEmpty";
-      value?: string;
-    }>;
-  };
-};
-type BuilderSection = { id: string; title: string; fields: BuilderField[] };
-type AppSchema = { sections: BuilderSection[] };
+import {
+  duplicateField,
+  fieldDefinition,
+  fieldDefinitions,
+  identifier,
+  removeField,
+  type AppSchema,
+  type BuilderField,
+  type FieldType,
+} from "../../../features/app-builder/model";
 type AppSummary = {
   id: string;
   code: string;
@@ -50,42 +25,12 @@ type AppSummary = {
 type AppVersion = { version: number; schema: AppSchema };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
-const palette: ReadonlyArray<{
-  type: FieldType;
-  label: string;
-  group: string;
-}> = [
-  { type: "shortText", label: "Texto corto", group: "Básicos" },
-  { type: "longText", label: "Texto largo", group: "Básicos" },
-  { type: "number", label: "Número", group: "Básicos" },
-  { type: "boolean", label: "Sí / No", group: "Básicos" },
-  { type: "date", label: "Fecha", group: "Básicos" },
-  { type: "time", label: "Hora", group: "Básicos" },
-  { type: "singleChoice", label: "Selección única", group: "Opciones" },
-  { type: "multipleChoice", label: "Selección múltiple", group: "Opciones" },
-  { type: "photo", label: "Foto", group: "Medios" },
-  { type: "file", label: "Archivo", group: "Medios" },
-  { type: "signature", label: "Firma", group: "Medios" },
-];
-
-function identifier(value: string): string {
-  const normalized = value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return normalized && /^[a-z]/.test(normalized)
-    ? normalized.slice(0, 64)
-    : "campo";
-}
-
 function newId(): string {
   return crypto.randomUUID();
 }
 
 function createField(type: FieldType, index: number): BuilderField {
-  const label = palette.find((field) => field.type === type)?.label ?? "Campo";
+  const label = fieldDefinition(type).label;
   return {
     id: newId(),
     type,
@@ -110,6 +55,8 @@ export default function AppBuilderPage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [editingField, setEditingField] = useState(false);
   const [editingRules, setEditingRules] = useState(false);
+  const [fieldPendingDeletion, setFieldPendingDeletion] =
+    useState<BuilderField | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -205,7 +152,8 @@ export default function AppBuilderPage() {
     const type = event.dataTransfer.getData(
       "application/x-hansa-field",
     ) as FieldType;
-    if (palette.some((field) => field.type === type)) addField(type, sectionId);
+    if (fieldDefinitions.some((field) => field.type === type))
+      addField(type, sectionId);
   }
 
   async function save() {
@@ -306,11 +254,11 @@ export default function AppBuilderPage() {
       <div className="builder-grid">
         <aside className="builder-palette" aria-label="Campos disponibles">
           <h2>Campos</h2>
-          {Array.from(new Set(palette.map((item) => item.group))).map(
+          {Array.from(new Set(fieldDefinitions.map((item) => item.group))).map(
             (group) => (
               <section key={group}>
                 <h3>{group}</h3>
-                {palette
+                {fieldDefinitions
                   .filter((item) => item.group === group)
                   .map((item) => (
                     <button
@@ -325,7 +273,9 @@ export default function AppBuilderPage() {
                       }
                       type="button"
                     >
-                      <span aria-hidden="true">⋮⋮</span>
+                      <span aria-hidden="true" className="palette-icon">
+                        {item.icon}
+                      </span>
                       {item.label}
                       <b aria-hidden="true">+</b>
                     </button>
@@ -367,55 +317,84 @@ export default function AppBuilderPage() {
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => handleDrop(event, section.id)}
               >
-                <input
-                  aria-label="Nombre de la sección"
-                  value={section.title}
-                  onChange={(event) =>
-                    setSchema((current) => ({
-                      sections: current.sections.map((item) =>
-                        item.id === section.id
-                          ? { ...item, title: event.target.value }
-                          : item,
-                      ),
-                    }))
-                  }
-                />
+                <div className="section-heading-inputs">
+                  <input
+                    aria-label="Nombre de la sección"
+                    value={section.title}
+                    onChange={(event) =>
+                      setSchema((current) => ({
+                        sections: current.sections.map((item) =>
+                          item.id === section.id
+                            ? { ...item, title: event.target.value }
+                            : item,
+                        ),
+                      }))
+                    }
+                  />
+                  <input
+                    aria-label="Subtítulo de la sección"
+                    placeholder="Subtítulo o indicación para el grupo"
+                    value={section.subtitle ?? ""}
+                    onChange={(event) =>
+                      setSchema((current) => ({
+                        sections: current.sections.map((item) =>
+                          item.id === section.id
+                            ? { ...item, subtitle: event.target.value }
+                            : item,
+                        ),
+                      }))
+                    }
+                  />
+                </div>
                 {section.fields.length === 0 ? (
                   <p className="section-drop">
                     Suelta aquí los campos para esta sección.
                   </p>
                 ) : (
                   section.fields.map((field) => (
-                    <button
+                    <article
                       className={`builder-field ${field.id === selectedId ? "selected" : ""}`}
                       key={field.id}
-                      onClick={() => {
-                        setSelectedId(field.id);
-                        setEditingField(true);
-                      }}
-                      type="button"
                     >
-                      <span aria-hidden="true">
-                        {field.type === "number"
-                          ? "123"
-                          : field.type === "boolean"
-                            ? "☑"
-                            : field.type === "date"
-                              ? "▣"
-                              : field.type === "photo"
-                                ? "◉"
-                                : "abc"}
-                      </span>
-                      <strong>{field.label}</strong>
-                      <small>
-                        {
-                          palette.find((item) => item.type === field.type)
-                            ?.label
-                        }{" "}
-                        · {field.key}
-                      </small>
-                      {field.required && <em>Obligatorio</em>}
-                    </button>
+                      <button
+                        className="builder-field-select"
+                        onClick={() => {
+                          setSelectedId(field.id);
+                          setEditingField(true);
+                        }}
+                        type="button"
+                      >
+                        <span aria-hidden="true" className="field-type-icon">
+                          {fieldDefinition(field.type).icon}
+                        </span>
+                        <strong>{field.label}</strong>
+                        <small>
+                          {fieldDefinition(field.type).label} · {field.key}
+                        </small>
+                        {field.required && <em>Obligatorio</em>}
+                      </button>
+                      <div className="field-controls">
+                        <button
+                          aria-label={`Duplicar ${field.label}`}
+                          onClick={() =>
+                            setSchema((current) =>
+                              duplicateField(current, field.id),
+                            )
+                          }
+                          type="button"
+                        >
+                          ⧉
+                        </button>
+                        <button
+                          aria-label={`Eliminar ${field.label}`}
+                          className="danger-icon"
+                          onClick={() => setFieldPendingDeletion(field)}
+                          type="button"
+                        >
+                          ⌫
+                        </button>
+                      </div>
+                    </article>
                   ))
                 )}
               </article>
@@ -527,9 +506,8 @@ export default function AppBuilderPage() {
               />
             </label>
             <p>
-              <strong>Tipo fijo:</strong>{" "}
-              {palette.find((item) => item.type === selected.type)?.label}. Para
-              usar otro tipo, crea un nuevo atributo.
+              <strong>Tipo fijo:</strong> {fieldDefinition(selected.type).label}
+              . Para usar otro tipo, crea un nuevo atributo.
             </p>
             {(selected.type === "singleChoice" ||
               selected.type === "multipleChoice") && (
@@ -750,6 +728,47 @@ export default function AppBuilderPage() {
                 type="button"
               >
                 Listo
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {fieldPendingDeletion && (
+        <div className="modal-backdrop">
+          <section
+            aria-labelledby="delete-field-title"
+            className="app-form"
+            role="dialog"
+            aria-modal="true"
+          >
+            <h2 id="delete-field-title">¿Eliminar atributo?</h2>
+            <p>
+              “{fieldPendingDeletion.label}” se eliminará solo de este borrador.
+              Las versiones ya guardadas y sus registros no cambian.
+            </p>
+            <div className="form-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setFieldPendingDeletion(null)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setSchema((current) =>
+                    removeField(current, fieldPendingDeletion.id),
+                  );
+                  if (selectedId === fieldPendingDeletion.id) {
+                    setSelectedId(null);
+                    setEditingField(false);
+                  }
+                  setFieldPendingDeletion(null);
+                }}
+                type="button"
+              >
+                Eliminar atributo
               </button>
             </div>
           </section>
