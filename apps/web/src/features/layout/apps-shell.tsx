@@ -1,18 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
-const futureModules = [
-  { label: "Importaciones", icon: "⇧" },
-  { label: "Exportaciones", icon: "⇩" },
-  { label: "Capas", icon: "◇" },
-  { label: "Proyectos", icon: "▤" },
-  { label: "Configuración", icon: "⚙" },
+const modules = [
+  { label: "Importaciones", icon: "⇧", href: "/apps/imports" },
+  { label: "Exportaciones", icon: "⇩", href: "/apps/exports" },
+  { label: "Capas", icon: "◇", href: "/apps/layers" },
+  { label: "Proyectos", icon: "▤", href: "/apps/projects" },
+  { label: "Configuración", icon: "⚙", href: "/apps/settings" },
 ] as const;
 
 export function AppsShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+  const moduleIsActive = modules.some((item) => pathname.startsWith(item.href));
+  const appsIsActive =
+    pathname === "/apps" || (pathname.startsWith("/apps/") && !moduleIsActive);
 
   return (
     <div className={collapsed ? "apps-shell is-collapsed" : "apps-shell"}>
@@ -37,21 +42,23 @@ export function AppsShell({ children }: { children: ReactNode }) {
         </div>
         <nav aria-label="Navegación de Hansa Field" className="apps-navigation">
           <p>OPERACIÓN</p>
-          <Link className="apps-navigation-link is-active" href="/apps">
+          <Link
+            className={`apps-navigation-link ${appsIsActive ? "is-active" : ""}`}
+            href="/apps"
+          >
             <span aria-hidden="true">▦</span>
             <span>Apps</span>
           </Link>
-          <p>PRÓXIMAMENTE</p>
-          {futureModules.map((item) => (
-            <span
-              aria-disabled="true"
-              className="apps-navigation-link is-disabled"
+          <p>GESTIÓN</p>
+          {modules.map((item) => (
+            <Link
+              className={`apps-navigation-link ${pathname.startsWith(item.href) ? "is-active" : ""}`}
+              href={item.href}
               key={item.label}
-              title={`${item.label}: módulo aún no implementado`}
             >
               <span aria-hidden="true">{item.icon}</span>
               <span>{item.label}</span>
-            </span>
+            </Link>
           ))}
         </nav>
         <div className="apps-user">

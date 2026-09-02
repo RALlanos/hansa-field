@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import {
+  RecordsMap,
+  type MapRecord,
+} from "../../../../features/records/records-map";
+
 type Field = {
   id: string;
   key: string;
@@ -21,12 +26,7 @@ type AppSchema = {
   sections: Array<{ id: string; title: string; fields: Field[] }>;
 };
 type App = { name: string; code: string; mapColor: string; mapIcon: string };
-type RecordItem = {
-  id: string;
-  attributes: Record<string, unknown>;
-  geometry: { type: "Point"; coordinates: [number, number] } | null;
-  updatedAt: string;
-};
+type RecordItem = MapRecord;
 type Mode = "map" | "split" | "table";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
 
@@ -89,7 +89,15 @@ export default function RecordsPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const attributes = Object.fromEntries(
-      fields.map((field) => [field.key, form.get(field.key) ?? ""]),
+      fields.map((field) => {
+        if (field.type === "boolean") return [field.key, form.has(field.key)];
+        if (field.type === "multipleChoice")
+          return [field.key, form.getAll(field.key).map(String)];
+        const value = String(form.get(field.key) ?? "");
+        if (field.type === "number")
+          return [field.key, value === "" ? null : Number(value)];
+        return [field.key, value];
+      }),
     );
     const longitude = String(form.get("longitude") ?? "");
     const latitude = String(form.get("latitude") ?? "");
@@ -191,28 +199,13 @@ export default function RecordsPage() {
       )}
       <div className={`records-view ${mode}`}>
         <section className="records-map" aria-label="Mapa de registros">
-          <p>Mapa · {app.mapIcon}</p>
-          {records
-            .filter((record) => record.geometry)
-            .map((record, index) => (
-              <button
-                aria-label={`Abrir registro ${record.id}`}
-                className="record-pin"
-                key={record.id}
-                onClick={() => setEditor(record)}
-                style={{
-                  background: app.mapColor,
-                  left: `${15 + ((index * 17) % 70)}%`,
-                  top: `${20 + ((index * 23) % 60)}%`,
-                }}
-                type="button"
-              >
-                ●
-              </button>
-            ))}
-          <small>
-            Los puntos se ubican mediante longitud y latitud en WGS84.
-          </small>
+          <RecordsMap
+            appId={appId}
+            color={app.mapColor}
+            onRecords={setRecords}
+            onSelect={setEditor}
+            records={records}
+          />
         </section>
         <section className="records-table">
           <table>
@@ -357,7 +350,7 @@ export default function RecordsPage() {
                 Longitud
                 <input
                   defaultValue={
-                    editor !== "new" && editor.geometry
+                    editor !== "new" && editor.geometry?.type === "Point"
                       ? editor.geometry.coordinates[0]
                       : ""
                   }
@@ -370,7 +363,7 @@ export default function RecordsPage() {
                 Latitud
                 <input
                   defaultValue={
-                    editor !== "new" && editor.geometry
+                    editor !== "new" && editor.geometry?.type === "Point"
                       ? editor.geometry.coordinates[1]
                       : ""
                   }
