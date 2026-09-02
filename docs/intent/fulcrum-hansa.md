@@ -1,4 +1,5 @@
 # Intención confirmada: Hansa Field
+
 ## Declaración de intención
 
 - **Resultado:** definir y construir Hansa Field como una plataforma corporativa configurable para la gestión operativa y el trabajo de campo.

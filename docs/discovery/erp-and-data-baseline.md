@@ -13,16 +13,16 @@ Esta revisión es de solo lectura. Su objetivo es identificar restricciones, cap
 
 ## Stack detectado en el ERP local
 
-| Capa | Tecnología observada |
-|---|---|
-| Backend | TypeScript, NestJS 10, Prisma 5 |
-| Web administrativa | Next.js 14, React 18, TanStack Query, Tailwind CSS |
-| PWA | Next.js 14, IndexedDB mediante `idb`, service worker/PWA |
-| Persistencia | PostgreSQL 16 |
-| Cache/soporte | Redis 7 |
-| Mapas actuales | Leaflet 1.9 |
-| Archivos | Abstracción de almacenamiento con adaptadores local y S3 |
-| Operación | Docker Compose en Linux |
+| Capa               | Tecnología observada                                     |
+| ------------------ | -------------------------------------------------------- |
+| Backend            | TypeScript, NestJS 10, Prisma 5                          |
+| Web administrativa | Next.js 14, React 18, TanStack Query, Tailwind CSS       |
+| PWA                | Next.js 14, IndexedDB mediante `idb`, service worker/PWA |
+| Persistencia       | PostgreSQL 16                                            |
+| Cache/soporte      | Redis 7                                                  |
+| Mapas actuales     | Leaflet 1.9                                              |
+| Archivos           | Abstracción de almacenamiento con adaptadores local y S3 |
+| Operación          | Docker Compose en Linux                                  |
 
 ## Patrones reutilizables
 

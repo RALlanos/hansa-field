@@ -28,20 +28,20 @@ Esta decisión sigue siendo preliminar hasta validar el stack, las dependencias 
 
 ## Módulos propuestos
 
-| Module id | Responsabilidad | Depende de | Prioridad propuesta |
-|---|---|---|---|
-| `platform-foundation` | Stack, dependencias, estructura del monolito modular, configuración, persistencia, archivos, contratos internos, manejo de errores y puertos para autorización futura. | — | Primero |
-| `workspaces-and-projects` | Estructura corporativa, proyectos, árboles de contenedores anidados, asociaciones con Apps, membresías de registros, importación contextual y permisos heredables por subárbol. | `platform-foundation` | MVP base |
-| `app-builder` | Apps de datos reutilizables, tipos de objeto con geometrías mixtas, formularios, campos comunes o condicionales, reglas, versiones, previsualización, publicación y capas de personalización por proyecto. | `platform-foundation`, `workspaces-and-projects` | MVP base |
-| `records-and-assets` | Registros, activos maestros, UUID, relaciones, estados, evidencias y metadatos. | `app-builder`, `workspaces-and-projects` | MVP base |
-| `geospatial-data` | Geometrías, mapas, capas, edición individual y masiva, validación CRS e importación/exportación SHP, KML/KMZ, CSV y GeoJSON priorizados. | `records-and-assets` | MVP |
-| `data-exchange` | Importación/exportación desde Apps o proyectos configurados, clasificación de un archivo hacia varias Apps, asignación simultánea a contenedores, mapeo, previsualización, validación, conflictos y trabajos asíncronos. | `records-and-assets`, `geospatial-data` | MVP |
-| `field-operations` | Captura, fotos, archivos, GPS, borradores, asignación de trabajo y posterior operación offline con sincronización. | `records-and-assets`, `geospatial-data` | MVP por etapas |
-| `review-and-governance` | Revisión, aprobación, conflictos, historial, auditoría, archivado y trazabilidad. | `records-and-assets`, `field-operations` | MVP |
-| `identity-and-access` | Login, usuarios, sesiones y permisos componibles por acción, recurso, alcance, sección y campo. Puede ofrecer perfiles como plantillas, pero no depende de una jerarquía fija de tipos de usuario. Implementa los puertos definidos por la fundación. | `platform-foundation`, `workspaces-and-projects` | Después de validar las bases |
-| `data-delivery` | Reportes, vistas, filtros guardados, PDF y compartición controlada; aplica restricciones cuando exista `identity-and-access`. | `data-exchange`, `review-and-governance` | MVP acotado / expansión posterior |
-| `integrations-and-automation` | API, webhooks, eventos, importaciones avanzadas, ERP y conciliación de materiales. | `records-and-assets`, `review-and-governance` | Posterior al núcleo independiente; el MVP solo prepara contratos |
-| `insights-and-operations` | Dashboards, indicadores, búsqueda transversal, observabilidad y operación a escala. | `data-delivery`, `integrations-and-automation` | Posterior al MVP |
+| Module id                     | Responsabilidad                                                                                                                                                                                                                                       | Depende de                                       | Prioridad propuesta                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
+| `platform-foundation`         | Stack, dependencias, estructura del monolito modular, configuración, persistencia, archivos, contratos internos, manejo de errores y puertos para autorización futura.                                                                                | —                                                | Primero                                                          |
+| `workspaces-and-projects`     | Estructura corporativa, proyectos, árboles de contenedores anidados, asociaciones con Apps, membresías de registros, importación contextual y permisos heredables por subárbol.                                                                       | `platform-foundation`                            | MVP base                                                         |
+| `app-builder`                 | Apps de datos reutilizables, tipos de objeto con geometrías mixtas, formularios, campos comunes o condicionales, reglas, versiones, previsualización, publicación y capas de personalización por proyecto.                                            | `platform-foundation`, `workspaces-and-projects` | MVP base                                                         |
+| `records-and-assets`          | Registros, activos maestros, UUID, relaciones, estados, evidencias y metadatos.                                                                                                                                                                       | `app-builder`, `workspaces-and-projects`         | MVP base                                                         |
+| `geospatial-data`             | Geometrías, mapas, capas, edición individual y masiva, validación CRS e importación/exportación SHP, KML/KMZ, CSV y GeoJSON priorizados.                                                                                                              | `records-and-assets`                             | MVP                                                              |
+| `data-exchange`               | Importación/exportación desde Apps o proyectos configurados, clasificación de un archivo hacia varias Apps, asignación simultánea a contenedores, mapeo, previsualización, validación, conflictos y trabajos asíncronos.                              | `records-and-assets`, `geospatial-data`          | MVP                                                              |
+| `field-operations`            | Captura, fotos, archivos, GPS, borradores, asignación de trabajo y posterior operación offline con sincronización.                                                                                                                                    | `records-and-assets`, `geospatial-data`          | MVP por etapas                                                   |
+| `review-and-governance`       | Revisión, aprobación, conflictos, historial, auditoría, archivado y trazabilidad.                                                                                                                                                                     | `records-and-assets`, `field-operations`         | MVP                                                              |
+| `identity-and-access`         | Login, usuarios, sesiones y permisos componibles por acción, recurso, alcance, sección y campo. Puede ofrecer perfiles como plantillas, pero no depende de una jerarquía fija de tipos de usuario. Implementa los puertos definidos por la fundación. | `platform-foundation`, `workspaces-and-projects` | Después de validar las bases                                     |
+| `data-delivery`               | Reportes, vistas, filtros guardados, PDF y compartición controlada; aplica restricciones cuando exista `identity-and-access`.                                                                                                                         | `data-exchange`, `review-and-governance`         | MVP acotado / expansión posterior                                |
+| `integrations-and-automation` | API, webhooks, eventos, importaciones avanzadas, ERP y conciliación de materiales.                                                                                                                                                                    | `records-and-assets`, `review-and-governance`    | Posterior al núcleo independiente; el MVP solo prepara contratos |
+| `insights-and-operations`     | Dashboards, indicadores, búsqueda transversal, observabilidad y operación a escala.                                                                                                                                                                   | `data-delivery`, `integrations-and-automation`   | Posterior al MVP                                                 |
 
 ## Orden de construcción propuesto
 
@@ -74,12 +74,12 @@ Sujeto + Acción + Recurso + Alcance + Visibilidad/edición de campos
 
 Ejemplos conceptuales:
 
-| Sujeto | Acción | Recurso y alcance | Restricción de datos |
-|---|---|---|---|
-| Operador A | Editar | Proyecto Norte y sus Apps | Todos los campos autorizados |
-| Operador B | Consultar y generar informes | Proyecto Norte | Solo lectura |
-| Comercial | Consultar y editar | Registros de clientes asignados | Ocultar secciones técnicas; editar únicamente campos comerciales |
-| Almacén | Consultar | Materiales de proyectos autorizados | Sin acceso a información técnica ni edición de registros |
+| Sujeto     | Acción                       | Recurso y alcance                   | Restricción de datos                                             |
+| ---------- | ---------------------------- | ----------------------------------- | ---------------------------------------------------------------- |
+| Operador A | Editar                       | Proyecto Norte y sus Apps           | Todos los campos autorizados                                     |
+| Operador B | Consultar y generar informes | Proyecto Norte                      | Solo lectura                                                     |
+| Comercial  | Consultar y editar           | Registros de clientes asignados     | Ocultar secciones técnicas; editar únicamente campos comerciales |
+| Almacén    | Consultar                    | Materiales de proyectos autorizados | Sin acceso a información técnica ni edición de registros         |
 
 Los perfiles como `operador`, `comercial` o `almacén` serán plantillas opcionales para asignar un conjunto inicial de permisos. No serán tipos cerrados ni impedirán añadir o retirar permisos específicos por persona.
 

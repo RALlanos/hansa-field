@@ -40,21 +40,21 @@ La fundación se considera validada cuando puede ejecutar un recorrido técnico 
 
 Reutilizar el ecosistema operativo ya conocido por Hansa, pero iniciar Hansa Field en un repositorio y base independientes:
 
-| Capa | Recomendación | Motivo |
-|---|---|---|
-| Runtime | Node.js 24 LTS | Es una versión LTS vigente y apta para producción; evita Node 20, que ya está EOL. |
-| Lenguaje | TypeScript | Unifica backend, web, contratos y validación; el ERP actual ya lo utiliza. |
-| Backend | NestJS 12 | Sus módulos encapsulan proveedores y exponen interfaces explícitas, ajustándose al monolito modular. |
-| Web | Next.js 16 + React 19 | Compatible con despliegue Node/Docker y con la experiencia existente del ERP. |
-| Base de datos | PostgreSQL 16/17 + PostGIS 3.6 estable | Mantiene datos relacionales, JSON dinámico y geometrías indexadas dentro de transacciones consistentes. |
-| Acceso SQL | SQL-first mediante `pg` y una capa tipada evaluada entre Kysely y consultas generadas | PostGIS es central y Prisma no soporta actualmente sus tipos geográficos de forma nativa. |
-| Mapas | MapLibre GL JS 6 | Renderizado WebGL, GeoJSON y teselas vectoriales; ofrece un camino de crecimiento más adecuado que cargar miles de marcadores DOM. |
-| Conversión GIS | GDAL/OGR en contenedor de trabajo | Lee, valida y transforma SHP, KML, GeoJSON y PostgreSQL sin implementar parsers propios de producción. |
-| Trabajos asíncronos | Redis + BullMQ | Separa importaciones y exportaciones grandes de las solicitudes HTTP y permite estados, reintentos y progreso. |
-| Apps/formularios | JSON Schema versionado + Ajv; UI Schema separado | La definición es portable y validable tanto en servidor como en cliente. El constructor visual no se acopla a la forma de persistencia. |
-| Archivos | Contrato S3-compatible; almacenamiento local solo en desarrollo | Permite conservar originales, evidencias y exportaciones sin inflar PostgreSQL. |
-| Pruebas | Unitarias e integración con Vitest; E2E con Playwright; PostGIS/Redis reales en CI | La fundación debe probar contratos y consultas espaciales contra servicios reales. |
-| Empaquetado | pnpm workspace + Docker Compose | Un repositorio, versiones coherentes y despliegue reproducible. |
+| Capa                | Recomendación                                                                         | Motivo                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime             | Node.js 24 LTS                                                                        | Es una versión LTS vigente y apta para producción; evita Node 20, que ya está EOL.                                                      |
+| Lenguaje            | TypeScript                                                                            | Unifica backend, web, contratos y validación; el ERP actual ya lo utiliza.                                                              |
+| Backend             | NestJS 12                                                                             | Sus módulos encapsulan proveedores y exponen interfaces explícitas, ajustándose al monolito modular.                                    |
+| Web                 | Next.js 16 + React 19                                                                 | Compatible con despliegue Node/Docker y con la experiencia existente del ERP.                                                           |
+| Base de datos       | PostgreSQL 16/17 + PostGIS 3.6 estable                                                | Mantiene datos relacionales, JSON dinámico y geometrías indexadas dentro de transacciones consistentes.                                 |
+| Acceso SQL          | SQL-first mediante `pg` y una capa tipada evaluada entre Kysely y consultas generadas | PostGIS es central y Prisma no soporta actualmente sus tipos geográficos de forma nativa.                                               |
+| Mapas               | MapLibre GL JS 6                                                                      | Renderizado WebGL, GeoJSON y teselas vectoriales; ofrece un camino de crecimiento más adecuado que cargar miles de marcadores DOM.      |
+| Conversión GIS      | GDAL/OGR en contenedor de trabajo                                                     | Lee, valida y transforma SHP, KML, GeoJSON y PostgreSQL sin implementar parsers propios de producción.                                  |
+| Trabajos asíncronos | Redis + BullMQ                                                                        | Separa importaciones y exportaciones grandes de las solicitudes HTTP y permite estados, reintentos y progreso.                          |
+| Apps/formularios    | JSON Schema versionado + Ajv; UI Schema separado                                      | La definición es portable y validable tanto en servidor como en cliente. El constructor visual no se acopla a la forma de persistencia. |
+| Archivos            | Contrato S3-compatible; almacenamiento local solo en desarrollo                       | Permite conservar originales, evidencias y exportaciones sin inflar PostgreSQL.                                                         |
+| Pruebas             | Unitarias e integración con Vitest; E2E con Playwright; PostGIS/Redis reales en CI    | La fundación debe probar contratos y consultas espaciales contra servicios reales.                                                      |
+| Empaquetado         | pnpm workspace + Docker Compose                                                       | Un repositorio, versiones coherentes y despliegue reproducible.                                                                         |
 
 ### Evidencia oficial revisada
 
@@ -123,11 +123,15 @@ Cada módulo será propietario de sus tablas y contratos. Un módulo no importar
 ```ts
 export interface ExecutionContext {
   principalId: string;
-  mode: 'SYSTEM_OPERATOR' | 'AUTHENTICATED_USER';
+  mode: "SYSTEM_OPERATOR" | "AUTHENTICATED_USER";
 }
 
 export interface AuthorizationPort {
-  can(context: ExecutionContext, capability: string, resource: ResourceRef): Promise<boolean>;
+  can(
+    context: ExecutionContext,
+    capability: string,
+    resource: ResourceRef,
+  ): Promise<boolean>;
 }
 
 export interface JobPort<TInput> {
@@ -135,7 +139,11 @@ export interface JobPort<TInput> {
 }
 
 export interface ObjectStoragePort {
-  put(input: { key: string; contentType: string; stream: NodeJS.ReadableStream }): Promise<void>;
+  put(input: {
+    key: string;
+    contentType: string;
+    stream: NodeJS.ReadableStream;
+  }): Promise<void>;
   get(key: string): Promise<NodeJS.ReadableStream>;
 }
 ```
@@ -314,13 +322,13 @@ Principio de resiliencia: un error o indisponibilidad de Hansa Field no debe afe
 
 La autoridad preliminar será:
 
-| Información | Autoridad |
-|---|---|
-| Credenciales e identidad corporativa futura | ERP o proveedor de identidad corporativo por confirmar |
-| Work Orders y materiales autorizados/entregados | ERP |
-| Edificios, activos, geometrías y evidencias de campo | Hansa Field |
-| Material observado o instalado | Hansa Field |
-| Diferencia entre esperado e instalado | Hansa Field como resultado derivado, vinculada a referencias del ERP |
+| Información                                          | Autoridad                                                            |
+| ---------------------------------------------------- | -------------------------------------------------------------------- |
+| Credenciales e identidad corporativa futura          | ERP o proveedor de identidad corporativo por confirmar               |
+| Work Orders y materiales autorizados/entregados      | ERP                                                                  |
+| Edificios, activos, geometrías y evidencias de campo | Hansa Field                                                          |
+| Material observado o instalado                       | Hansa Field                                                          |
+| Diferencia entre esperado e instalado                | Hansa Field como resultado derivado, vinculada a referencias del ERP |
 
 ### Secuencia aprobada
 
@@ -385,10 +393,10 @@ Ejemplo:
 
 ```ts
 export type ImportJobState =
-  | { type: 'QUEUED'; queuedAt: string }
-  | { type: 'VALIDATING'; processed: number; total: number }
-  | { type: 'READY_FOR_CONFIRMATION'; summary: ImportSummary }
-  | { type: 'FAILED'; errorCode: string };
+  | { type: "QUEUED"; queuedAt: string }
+  | { type: "VALIDATING"; processed: number; total: number }
+  | { type: "READY_FOR_CONFIRMATION"; summary: ImportSummary }
+  | { type: "FAILED"; errorCode: string };
 ```
 
 ## Estrategia de pruebas

@@ -83,14 +83,14 @@ Objetivo demostrable: crear una App, importar un conjunto geográfico sencillo, 
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|---|---:|---|
-| Lectura DWG en Linux sin AutoCAD | Alto | Prueba técnica en Phase 1; validar formato, licencia y calidad antes de integrarlo. |
-| Importaciones grandes agotan memoria o disco | Alto | Streaming, cuotas, trabajos persistentes, temporales aislados y pruebas crecientes. |
-| Variantes por proyecto vuelven inmantenible una App | Alto | Esquema base + overlay versionado, vista de diferencias y validación de compatibilidad. |
-| Datos geográficos usan CRS incorrecto | Alto | Detección, previsualización, corrección manual y conservación de procedencia. |
-| Reimportación sobrescribe datos incorrectos | Alto | UUID autoritativo, diff previo, confirmación y rechazo de UUID desconocidos. |
-| Funciones futuras de permisos obligan a reescribir módulos | Medio | Puerto de autorización desde la fundación y contextos de recurso explícitos. |
+| Risk                                                       | Impact | Mitigation                                                                              |
+| ---------------------------------------------------------- | -----: | --------------------------------------------------------------------------------------- |
+| Lectura DWG en Linux sin AutoCAD                           |   Alto | Prueba técnica en Phase 1; validar formato, licencia y calidad antes de integrarlo.     |
+| Importaciones grandes agotan memoria o disco               |   Alto | Streaming, cuotas, trabajos persistentes, temporales aislados y pruebas crecientes.     |
+| Variantes por proyecto vuelven inmantenible una App        |   Alto | Esquema base + overlay versionado, vista de diferencias y validación de compatibilidad. |
+| Datos geográficos usan CRS incorrecto                      |   Alto | Detección, previsualización, corrección manual y conservación de procedencia.           |
+| Reimportación sobrescribe datos incorrectos                |   Alto | UUID autoritativo, diff previo, confirmación y rechazo de UUID desconocidos.            |
+| Funciones futuras de permisos obligan a reescribir módulos |  Medio | Puerto de autorización desde la fundación y contextos de recurso explícitos.            |
 
 ## Deliberately Deferred
 

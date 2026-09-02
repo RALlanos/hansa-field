@@ -55,28 +55,28 @@ La repetición de una importación con UUID conocido debe actualizar el registro
 
 ## Entorno comprobado al inicio
 
-| Componente | Versión detectada |
-|---|---|
-| Node.js | 24.19.0 |
-| Corepack | 0.35.0 |
-| pnpm | 11.19.0 |
-| Docker | 29.7.2 |
-| Docker Compose | 5.4.0 |
+| Componente     | Versión detectada |
+| -------------- | ----------------- |
+| Node.js        | 24.19.0           |
+| Corepack       | 0.35.0            |
+| pnpm           | 11.19.0           |
+| Docker         | 29.7.2            |
+| Docker Compose | 5.4.0             |
 
 ## Cambios de alcance o diseño durante la implementación
 
 Registrar aquí únicamente cambios reales respecto del plan aprobado, incluyendo fecha, motivo, impacto y decisión. No usar esta sección para describir trabajo rutinario.
 
-| Fecha y hora | Cambio | Motivo | Impacto |
-|---|---|---|---|
-| — | Ninguno al inicio | — | — |
+| Fecha y hora                  | Cambio                                                                                                            | Motivo                                                                      | Impacto                                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-09-02 12:49:31 UTC-04:00 | La lista de dependencias autorizadas para ejecutar scripts se trasladó de `package.json` a `pnpm-workspace.yaml`. | pnpm 11.19 informó que esa configuración ya no se lee desde `package.json`. | No cambia el alcance; mantiene bloqueados los scripts de instalación en la ubicación vigente. |
 
 ## Percances durante la implementación
 
 Esta sección se completará únicamente si ocurre un problema real que afecte el plan, el resultado, el tiempo o una decisión técnica. Si no ocurre ningún percance, se eliminará al cerrar la entrega según la instrucción del usuario.
 
-| Fecha y hora | Percance | Diagnóstico | Resolución o estado |
-|---|---|---|---|
+| Fecha y hora                  | Percance                                 | Diagnóstico                                                                                                                 | Resolución o estado                                                                                                             |
+| ----------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-02 12:45:41 UTC-04:00 | Git rechazó el primer commit documental. | La PC no tenía `user.name` ni `user.email` configurados. Los archivos ya estaban preparados, pero no se creó ningún commit. | Se configurará una identidad técnica únicamente en este repositorio, sin alterar la configuración global ni publicar contenido. |
 
 ## Cierre de la entrega
