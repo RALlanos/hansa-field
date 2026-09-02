@@ -13,7 +13,7 @@
 
 ## Sistema visual
 
-La paleta cambia a plomo: gris carbón para navegación, blanco/gris claro para superficies y gris acero para foco y acciones. Todos los botones y componentes existentes consumen los mismos tokens de marca para evitar color rojo residual.
+La paleta usa rojo Hansa: rojo profundo para navegación y acciones, blanco/gris claro para superficies y rojo claro para foco. Todos los botones y componentes existentes consumen los mismos tokens de marca para evitar paletas residuales.
 
 ## Referencias externas
 

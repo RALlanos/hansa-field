@@ -8,7 +8,7 @@
 
 ## Objetivo
 
-Sustituir la primera pantalla experimental por una shell operativa consistente: lateral oscuro fijo, barra superior blanca, jerarquía tipográfica reducida y área central orientada a abrir Apps. Hansa Field se identifica con azul marino/negro y blanco; el rojo deja de ser color de marca.
+Sustituir la primera pantalla experimental por una shell operativa consistente: lateral oscuro fijo, barra superior blanca, jerarquía tipográfica reducida y área central orientada a abrir Apps. Hansa Field se identifica con rojo profundo, blanco y grises neutros.
 
 ## Límites funcionales
 
