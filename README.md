@@ -25,13 +25,20 @@ La web utilizará `http://localhost:3200`, la API `http://localhost:3100` y Post
 
 ## Comandos
 
-| Comando          | Propósito                                |
-| ---------------- | ---------------------------------------- |
-| `pnpm dev`       | Ejecutar los paquetes en modo desarrollo |
-| `pnpm test`      | Ejecutar pruebas                         |
-| `pnpm typecheck` | Verificar tipos                          |
-| `pnpm lint`      | Analizar el workspace con oxlint         |
-| `pnpm build`     | Crear compilaciones de producción        |
+| Comando                 | Propósito                                |
+| ----------------------- | ---------------------------------------- |
+| `pnpm dev`              | Ejecutar los paquetes en modo desarrollo |
+| `pnpm test`             | Ejecutar pruebas                         |
+| `pnpm typecheck`        | Verificar tipos                          |
+| `pnpm lint`             | Analizar el workspace con oxlint         |
+| `pnpm quality`          | Formato, lint, tipos y pruebas unitarias |
+| `pnpm test:integration` | Validar migraciones contra PostGIS real  |
+| `pnpm test:e2e`         | Ejecutar el smoke E2E en Chromium        |
+| `pnpm quality:full`     | Ejecutar todos los gates más build y E2E |
+| `pnpm build`            | Crear compilaciones de producción        |
+
+La primera vez que se ejecuten las pruebas E2E, instala el navegador con
+`pnpm exec playwright install chromium`.
 
 ## Arquitectura
 

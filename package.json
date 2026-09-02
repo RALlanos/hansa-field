@@ -11,12 +11,26 @@
     "dev": "pnpm -r --parallel --if-present dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "oxlint .",
+    "lint": "oxlint --import-plugin --react-plugin --vitest-plugin --jsx-a11y-plugin --nextjs-plugin --promise-plugin --deny no-console .",
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "test:unit": "pnpm -r --if-present test:unit",
+    "test:integration": "pnpm --filter @hansa-field/api test:integration",
+    "test:e2e": "playwright test",
+    "skills:check": "node scripts/validate-skills.mjs",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "quality": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm skills:check",
+    "quality:full": "pnpm quality && pnpm test:integration && pnpm build && pnpm test:e2e",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "husky": "9.1.7",
+    "lint-staged": "16.2.7",
     "oxlint": "1.81.0",
     "prettier": "3.9.6"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": "oxlint --fix",
+    "*.{ts,tsx,js,jsx,json,md,yml,yaml}": "prettier --write"
   }
 }

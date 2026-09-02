@@ -93,6 +93,7 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 15:36 UTC-04:00    | `GET /api/apps` continuó devolviendo 500 tras cargar configuración. | `AppsController` no recibió `AppsService` en desarrollo por la metadata implícita de decoradores de `tsx`; la base aún no fue consultada.                             | Se declara el token de `AppsService` de forma explícita y se añade una prueba enfocada antes de repetir la consulta HTTP.                     |
 | 2026-09-02 16:08 UTC-04:00    | La primera verificación de tipos del constructor falló.             | El estado temporal del campo creado dentro del actualizador de React era inferido como `never` al leerse después del actualizador.                                    | El campo se construye antes de actualizar el estado; pruebas, tipos y compilación posteriores fueron correctas.                               |
 | 2026-09-02 16:22 UTC-04:00    | La migración de ajustes de App no inició en local.                  | El comando de migración no cargaba `DATABASE_URL` desde la configuración de desarrollo. La API nueva consultó columnas que aún no existían y respondió 500.           | Se carga el archivo de entorno explícitamente en migración, se aplica el cambio y se repite la comprobación HTTP.                             |
+| 2026-09-02 16:52 UTC-04:00    | El primer commit con hook de calidad fue rechazado.                 | Git Bash no encontraba el shim de `pnpm`, aunque PowerShell sí lo tenía disponible.                                                                                   | El hook ejecutará `lint-staged` mediante el binario `node` disponible en Git, sin desactivar controles.                                       |
 
 ## Avances verificados
 
@@ -113,6 +114,7 @@ Esta sección se completará únicamente si ocurre un problema real que afecte e
 | 2026-09-02 16:24 UTC-04:00 | Ajustes y reglas del constructor separados. | La App tiene descripción, icono y color persistentes. Un atributo abre su editor propio, conserva tipo fijo y admite condiciones `all`/`any`, operadores y conservación opcional del valor al ocultarse. |
 | 2026-09-02 16:25 UTC-04:00 | Inicio de Registros manuales por App. | Se habilitará una vista de registros para crear y editar datos manuales, inicialmente con Punto o sin geometría, vinculados a la versión de formulario vigente. |
 | 2026-09-02 16:28 UTC-04:00 | Primer flujo de Registros manuales. | `View records` abre los mismos datos como mapa, vista dividida o tabla. Se crean y editan atributos con el formulario versionado y coordenadas de Punto opcionales. |
+| 2026-09-02 16:51 UTC-04:00 | Endurecimiento del entorno de desarrollo. | Se añaden reglas persistentes, 10 skills de repositorio, Prettier explícito, quality gates, unit/integration/E2E, hook local y auditoría; infraestructura GIS futura queda deliberadamente fuera. |
 
 ## Cierre de la entrega
 

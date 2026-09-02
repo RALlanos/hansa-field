@@ -10,6 +10,8 @@
     "db:rollback": "tsx --env-file=../../.env.example src/database/migrate.ts down",
     "start": "node dist/main.js",
     "test": "vitest run",
+    "test:unit": "vitest run --exclude src/database/migrator.spec.ts",
+    "test:integration": "vitest run src/database/migrator.spec.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
