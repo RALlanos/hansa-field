@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "tsx watch --env-file=../../.env.example src/main.ts",
     "db:migrate": "tsx src/database/migrate.ts up",
     "db:rollback": "tsx src/database/migrate.ts down",
     "start": "node dist/main.js",
