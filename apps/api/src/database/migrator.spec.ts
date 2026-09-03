@@ -52,6 +52,18 @@ describe("foundation database migration", () => {
        VALUES ('POSTES', 'Postes', ARRAY['Point']) RETURNING id`,
     );
     const appId = app.rows[0]?.id;
+    await expect(
+      client.query(
+        `UPDATE app_definitions SET map_icon = 'tower', map_color = '#245b8f' WHERE id = $1`,
+        [appId],
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      client.query(
+        `UPDATE app_definitions SET map_icon = 'unknown' WHERE id = $1`,
+        [appId],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
     const project = await client.query<{ id: string }>(
       `INSERT INTO projects (code, name) VALUES ('LPZ_FTTH', 'La Paz FTTH') RETURNING id`,
     );

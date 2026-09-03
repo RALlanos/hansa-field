@@ -247,4 +247,29 @@ export const migrations: readonly Migration[] = [
         DROP COLUMN IF EXISTS import_scope;
     `,
   },
+  {
+    id: "0008_app_map_symbol_catalog",
+    up: `
+      ALTER TABLE app_definitions
+        DROP CONSTRAINT IF EXISTS app_definitions_map_icon_check,
+        ADD CONSTRAINT app_definitions_map_icon_check CHECK (
+          map_icon IN (
+            'pin', 'square', 'triangle', 'diamond', 'hexagon',
+            'home', 'building', 'tower', 'mast', 'post',
+            'lamp-post', 'splice', 'electric', 'generator', 'battery',
+            'satellite', 'node', 'olt', 'cable', 'cable-dashed'
+          )
+        );
+    `,
+    down: `
+      UPDATE app_definitions
+      SET map_icon = 'pin'
+      WHERE map_icon NOT IN ('pin', 'post', 'cable', 'node', 'building');
+
+      ALTER TABLE app_definitions
+        DROP CONSTRAINT IF EXISTS app_definitions_map_icon_check,
+        ADD CONSTRAINT app_definitions_map_icon_check
+          CHECK (map_icon IN ('pin', 'post', 'cable', 'node', 'building'));
+    `,
+  },
 ];

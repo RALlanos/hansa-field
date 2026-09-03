@@ -9,6 +9,7 @@ import {
   DatabaseService,
   type DatabaseQuery,
 } from "../database/database.service.js";
+import type { MapIconId } from "./map-icons.js";
 
 export type AllowedGeometry = "Point" | "LineString" | "Polygon";
 
@@ -24,7 +25,7 @@ export type AppSummary = Readonly<{
   name: string;
   allowedGeometries: AllowedGeometry[];
   description: string;
-  mapIcon: "pin" | "post" | "cable" | "node" | "building";
+  mapIcon: MapIconId;
   mapColor: string;
   createdAt: string;
 }>;

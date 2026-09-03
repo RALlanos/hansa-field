@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { UnprocessableEntityException } from "@nestjs/common";
 
 import { AppsController } from "./apps.controller.js";
 
@@ -38,5 +39,35 @@ describe("AppsController", () => {
         },
       ],
     });
+  });
+
+  it("accepts a visual telecom symbol in the App settings", async () => {
+    const updateSettings = vi.fn().mockResolvedValue({ mapIcon: "tower" });
+    const controller = new AppsController({ updateSettings } as never);
+
+    await expect(
+      controller.updateSettings("app-id", {
+        description: "Torres de telecomunicaciones",
+        mapIcon: "tower",
+        mapColor: "#245b8f",
+      }),
+    ).resolves.toEqual({ mapIcon: "tower" });
+    expect(updateSettings).toHaveBeenCalledWith("app-id", {
+      description: "Torres de telecomunicaciones",
+      mapIcon: "tower",
+      mapColor: "#245b8f",
+    });
+  });
+
+  it("rejects a map symbol outside the visual catalog", async () => {
+    const controller = new AppsController({ updateSettings: vi.fn() } as never);
+
+    await expect(
+      controller.updateSettings("app-id", {
+        description: "",
+        mapIcon: "texto-sin-simbolo",
+        mapColor: "#245b8f",
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 });

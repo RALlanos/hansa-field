@@ -18,6 +18,7 @@ import {
   type CreateAppInput,
   type UpdateAppSettingsInput,
 } from "./apps.service.js";
+import { MAP_ICON_IDS } from "./map-icons.js";
 
 const createAppSchema = z
   .object({
@@ -100,7 +101,7 @@ const appSchemaSchema = z
 const appSettingsSchema = z
   .object({
     description: z.string().trim().max(1000),
-    mapIcon: z.enum(["pin", "post", "cable", "node", "building"]),
+    mapIcon: z.enum(MAP_ICON_IDS),
     mapColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   })
   .strict();
