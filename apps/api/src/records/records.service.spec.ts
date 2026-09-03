@@ -32,4 +32,46 @@ describe("RecordsService", () => {
       attributes: { codigo: "P-01" },
     });
   });
+
+  it("returns clustered map features without exposing every record", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          id: "cluster:app-id:1",
+          app_id: "app-id",
+          app_name: "Postes",
+          map_icon: "post",
+          map_color: "#65a30d",
+          feature_count: 847,
+          total_records: 10_000,
+          total_features: 1,
+          geometry: { type: "Point", coordinates: [-63.1, -17.8] },
+        },
+      ],
+    });
+    const service = new RecordsService({ query } as never);
+
+    await expect(
+      service.listMapFeatures({
+        appIds: ["app-id"],
+        bounds: [-69, -23, -57, -9],
+        zoom: 8,
+      }),
+    ).resolves.toEqual({
+      data: [
+        {
+          id: "cluster:app-id:1",
+          appId: "app-id",
+          appName: "Postes",
+          mapIcon: "post",
+          mapColor: "#65a30d",
+          count: 847,
+          geometry: { type: "Point", coordinates: [-63.1, -17.8] },
+        },
+      ],
+      clustered: true,
+      totalRecords: 10_000,
+      truncated: false,
+    });
+  });
 });
