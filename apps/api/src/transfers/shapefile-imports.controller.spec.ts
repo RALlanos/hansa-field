@@ -43,4 +43,44 @@ describe("ShapefileImportsController", () => {
     });
     expect(inspect).not.toHaveBeenCalled();
   });
+
+  it("requires explicit table, georeference and field decisions before planning", async () => {
+    const plan = vi.fn().mockResolvedValue({ total: 1, errors: [] });
+    const controller = new ShapefileImportsController({ plan } as never);
+    const jobId = "9c18b925-718f-4182-9ea4-fe0039c33a46";
+    const selection = {
+      georeferenceConfirmed: true,
+      tableMappings: [
+        {
+          sourceStatus: "POSTES",
+          targetAppId: "eb0faee2-4252-4dd3-b7b7-8a40d97129c1",
+        },
+      ],
+      fieldMappings: [
+        {
+          targetAppId: "eb0faee2-4252-4dd3-b7b7-8a40d97129c1",
+          sourceField: "hps",
+          targetFieldKey: "hps",
+        },
+      ],
+    } as const;
+
+    await expect(controller.plan(jobId, selection)).resolves.toEqual({
+      total: 1,
+      errors: [],
+    });
+    expect(plan).toHaveBeenCalledWith(jobId, selection);
+  });
+
+  it("does not confirm when the final explicit confirmation is absent", async () => {
+    const confirm = vi.fn();
+    const controller = new ShapefileImportsController({ confirm } as never);
+
+    await expect(
+      controller.confirm("9c18b925-718f-4182-9ea4-fe0039c33a46", {}),
+    ).rejects.toMatchObject({
+      response: { code: "IMPORT_CONFIRMATION_REQUIRED" },
+    });
+    expect(confirm).not.toHaveBeenCalled();
+  });
 });

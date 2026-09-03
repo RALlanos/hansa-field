@@ -243,7 +243,15 @@ export async function readShapefileArchive(
     records: readonly ShapefileSourceRecord[];
   }>
 > {
-  const parts = await readShapefileParts(archive);
+  let parts: Awaited<ReturnType<typeof readShapefileParts>>;
+  try {
+    parts = await readShapefileParts(archive);
+  } catch (error: unknown) {
+    if (error instanceof InvalidShapefileArchiveError) throw error;
+    throw new InvalidShapefileArchiveError(
+      "El ZIP está dañado o no tiene una estructura válida.",
+    );
+  }
   const crs = detectWgs84(parts.prj);
   const source = await openShapefile(parts.shp, parts.dbf, {
     encoding: "windows-1252",

@@ -3,6 +3,8 @@ import {
   HttpCode,
   Inject,
   Post,
+  Param,
+  Body,
   Query,
   Req,
   UnprocessableEntityException,
@@ -21,6 +23,37 @@ const scopeSchema = z.discriminatedUnion("type", [
     .strict(),
   z.object({ type: z.literal("app"), appId: z.string().uuid() }).strict(),
 ]);
+const selectionSchema = z
+  .object({
+    georeferenceConfirmed: z.literal(true),
+    tableMappings: z
+      .array(
+        z
+          .object({
+            sourceStatus: z.string().trim().min(1).max(250),
+            targetAppId: z.string().uuid().nullable(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(200),
+    fieldMappings: z
+      .array(
+        z
+          .object({
+            targetAppId: z.string().uuid(),
+            sourceField: z.string().trim().min(1).max(128),
+            targetFieldKey: z
+              .string()
+              .regex(/^[a-z][a-z0-9_]{0,63}$/)
+              .nullable(),
+          })
+          .strict(),
+      )
+      .max(10_000),
+  })
+  .strict();
+const confirmationSchema = selectionSchema.extend({ confirm: z.literal(true) });
 
 @Controller("imports/shapefile")
 export class ShapefileImportsController {
@@ -56,9 +89,13 @@ export class ShapefileImportsController {
         throw new InvalidShapefileArchiveError("Selecciona un archivo ZIP.");
       }
       const fileName = file.filename.trim();
-      if (!fileName.toLowerCase().endsWith(".zip")) {
+      if (
+        fileName.length > 255 ||
+        fileName.includes("\0") ||
+        !fileName.toLowerCase().endsWith(".zip")
+      ) {
         throw new InvalidShapefileArchiveError(
-          "El archivo debe tener extensión .zip.",
+          "El nombre del archivo ZIP no es válido.",
         );
       }
       const archive = await file.toBuffer();
@@ -81,6 +118,43 @@ export class ShapefileImportsController {
         });
       }
       throw error;
+    }
+  }
+
+  @Post(":jobId/plan")
+  @HttpCode(200)
+  async plan(@Param("jobId") jobId: string, @Body() body: unknown) {
+    this.assertJobId(jobId);
+    const selection = selectionSchema.safeParse(body);
+    if (!selection.success) {
+      throw new UnprocessableEntityException({
+        code: "INVALID_IMPORT_SELECTION",
+        message: "La selección de tablas o campos está incompleta.",
+        details: selection.error.flatten(),
+      });
+    }
+    return this.imports.plan(jobId, selection.data);
+  }
+
+  @Post(":jobId/confirm")
+  async confirm(@Param("jobId") jobId: string, @Body() body: unknown) {
+    this.assertJobId(jobId);
+    const confirmation = confirmationSchema.safeParse(body);
+    if (!confirmation.success) {
+      throw new UnprocessableEntityException({
+        code: "IMPORT_CONFIRMATION_REQUIRED",
+        message: "Confirma explícitamente la importación después de revisarla.",
+      });
+    }
+    return this.imports.confirm(jobId, confirmation.data);
+  }
+
+  private assertJobId(jobId: string): void {
+    if (!z.string().uuid().safeParse(jobId).success) {
+      throw new UnprocessableEntityException({
+        code: "INVALID_IMPORT_JOB_ID",
+        message: "El identificador del trabajo no es válido.",
+      });
     }
   }
 }

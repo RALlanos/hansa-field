@@ -166,10 +166,7 @@ export const migrations: readonly Migration[] = [
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         profile_code text NOT NULL,
         profile_version integer NOT NULL,
-        import_scope text NOT NULL DEFAULT 'standalone'
-          CHECK (import_scope IN ('standalone', 'project', 'app')),
         project_id uuid REFERENCES projects(id) ON DELETE RESTRICT,
-        target_app_id uuid REFERENCES app_definitions(id) ON DELETE RESTRICT,
         status text NOT NULL CHECK (status IN ('inspected', 'importing', 'completed', 'failed')),
         source_file_name text NOT NULL,
         source_layer text NOT NULL,
@@ -183,12 +180,7 @@ export const migrations: readonly Migration[] = [
         created_at timestamptz NOT NULL DEFAULT now(),
         completed_at timestamptz,
         FOREIGN KEY (profile_code, profile_version)
-          REFERENCES import_profiles(code, version),
-        CONSTRAINT import_jobs_scope_target_check CHECK (
-          (import_scope = 'standalone' AND project_id IS NULL AND target_app_id IS NULL)
-          OR (import_scope = 'project' AND project_id IS NOT NULL AND target_app_id IS NULL)
-          OR (import_scope = 'app' AND project_id IS NULL AND target_app_id IS NOT NULL)
-        )
+          REFERENCES import_profiles(code, version)
       );
 
       CREATE TABLE record_import_sources (
@@ -216,6 +208,43 @@ export const migrations: readonly Migration[] = [
       DROP TABLE IF EXISTS record_import_sources;
       DROP TABLE IF EXISTS import_jobs;
       DROP TABLE IF EXISTS import_profiles;
+    `,
+  },
+  {
+    id: "0007_import_job_scope",
+    up: `
+      ALTER TABLE import_jobs
+        ADD COLUMN IF NOT EXISTS import_scope text NOT NULL DEFAULT 'standalone',
+        ADD COLUMN IF NOT EXISTS target_app_id uuid REFERENCES app_definitions(id) ON DELETE RESTRICT;
+
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'import_jobs'::regclass
+            AND conname = 'import_jobs_import_scope_value_check'
+        ) THEN
+          ALTER TABLE import_jobs ADD CONSTRAINT import_jobs_import_scope_value_check
+            CHECK (import_scope IN ('standalone', 'project', 'app'));
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conrelid = 'import_jobs'::regclass
+            AND conname = 'import_jobs_scope_target_check'
+        ) THEN
+          ALTER TABLE import_jobs ADD CONSTRAINT import_jobs_scope_target_check CHECK (
+            (import_scope = 'standalone' AND project_id IS NULL AND target_app_id IS NULL)
+            OR (import_scope = 'project' AND project_id IS NOT NULL AND target_app_id IS NULL)
+            OR (import_scope = 'app' AND project_id IS NULL AND target_app_id IS NOT NULL)
+          );
+        END IF;
+      END $$;
+    `,
+    down: `
+      ALTER TABLE import_jobs
+        DROP CONSTRAINT IF EXISTS import_jobs_scope_target_check,
+        DROP CONSTRAINT IF EXISTS import_jobs_import_scope_value_check,
+        DROP COLUMN IF EXISTS target_app_id,
+        DROP COLUMN IF EXISTS import_scope;
     `,
   },
 ];

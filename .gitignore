@@ -22,4 +22,4 @@ apps/web/next-env.d.ts
 Thumbs.db
 
 work/
-var/imports/
+**/var/imports/
