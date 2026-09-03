@@ -3,11 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 
+import { MapSymbol } from "../../features/apps/map-symbols";
+
 type AppSummary = {
   id: string;
   code: string;
   name: string;
   allowedGeometries: string[];
+  mapIcon: string;
+  mapColor: string;
 };
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
 
@@ -108,7 +112,13 @@ export default function AppsPage() {
         ) : (
           apps.map((app) => (
             <article className="app-row" key={app.id}>
-              <div className="app-row-icon">▦</div>
+              <div className="app-row-icon">
+                <MapSymbol
+                  color={app.mapColor}
+                  icon={app.mapIcon}
+                  label={`Símbolo de ${app.name}`}
+                />
+              </div>
               <div>
                 <h2>{app.name}</h2>
                 <p>

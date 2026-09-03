@@ -13,13 +13,15 @@ import {
   type BuilderField,
   type FieldType,
 } from "../../../features/app-builder/model";
+import { type MapIconId } from "../../../features/apps/map-symbols";
+import { AppSymbolPicker } from "../../../features/apps/app-symbol-picker";
 type AppSummary = {
   id: string;
   code: string;
   name: string;
   allowedGeometries: string[];
   description: string;
-  mapIcon: "pin" | "post" | "cable" | "node" | "building";
+  mapIcon: MapIconId;
   mapColor: string;
 };
 type AppVersion = { version: number; schema: AppSchema };
@@ -413,34 +415,12 @@ export default function AppBuilderPage() {
                 }
               />
             </label>
-            <label>
-              Icono del mapa
-              <select
-                value={app.mapIcon}
-                onChange={(event) =>
-                  setApp({
-                    ...app,
-                    mapIcon: event.target.value as AppSummary["mapIcon"],
-                  })
-                }
-              >
-                <option value="pin">Pin</option>
-                <option value="post">Poste</option>
-                <option value="cable">Cable</option>
-                <option value="node">Nodo</option>
-                <option value="building">Edificio</option>
-              </select>
-            </label>
-            <label>
-              Color de la capa
-              <input
-                type="color"
-                value={app.mapColor}
-                onChange={(event) =>
-                  setApp({ ...app, mapColor: event.target.value })
-                }
-              />
-            </label>
+            <AppSymbolPicker
+              color={app.mapColor}
+              icon={app.mapIcon}
+              onColorChange={(mapColor) => setApp({ ...app, mapColor })}
+              onIconChange={(mapIcon) => setApp({ ...app, mapIcon })}
+            />
             <p>
               Estos ajustes pertenecen a toda la App, no a un atributo
               individual.

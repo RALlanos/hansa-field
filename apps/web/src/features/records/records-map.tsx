@@ -4,12 +4,14 @@ import "leaflet/dist/leaflet.css";
 
 import { useEffect, useRef, useState } from "react";
 import type {
-  CircleMarker,
   GeoJSON,
   LeafletMouseEvent,
   Map as LeafletMap,
+  Marker,
 } from "leaflet";
 import type { FeatureCollection } from "geojson";
+
+import { mapIconMarkerHtml, mapLineDashArray } from "../apps/map-symbols";
 
 export type RecordGeometry =
   | { type: "Point"; coordinates: [number, number] }
@@ -25,6 +27,7 @@ export type MapRecord = {
 type Props = {
   appId: string;
   color: string;
+  icon: string;
   records: MapRecord[];
   pickedPoint: [number, number] | null;
   picking: boolean;
@@ -38,6 +41,7 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
 export function RecordsMap({
   appId,
   color,
+  icon,
   records,
   pickedPoint,
   picking,
@@ -50,7 +54,7 @@ export function RecordsMap({
   const layer = useRef<GeoJSON | null>(null);
   const recordsRef = useRef(records);
   const fitted = useRef(false);
-  const pickedMarker = useRef<CircleMarker | null>(null);
+  const pickedMarker = useRef<Marker | null>(null);
   const pickingRef = useRef(picking);
   const onPickRef = useRef(onPick);
   const [initialized, setInitialized] = useState(false);
@@ -136,14 +140,20 @@ export function RecordsMap({
       const nextLayer = leaflet
         .geoJSON(collection, {
           pointToLayer: (_feature, latlng) =>
-            leaflet.circleMarker(latlng, {
-              radius: 6,
-              color: "#ffffff",
-              weight: 2,
-              fillColor: color,
-              fillOpacity: 0.95,
+            leaflet.marker(latlng, {
+              icon: leaflet.divIcon({
+                className: "record-map-div-icon",
+                html: mapIconMarkerHtml(icon, color),
+                iconAnchor: [11, 11],
+                iconSize: [22, 22],
+              }),
             }),
-          style: { color, weight: 3, fillOpacity: 0.2 },
+          style: {
+            color,
+            dashArray: mapLineDashArray(icon),
+            weight: 3,
+            fillOpacity: 0.2,
+          },
           onEachFeature: (feature, featureLayer) => {
             const record = recordsRef.current.find(
               (item) => item.id === feature.id,
@@ -164,7 +174,7 @@ export function RecordsMap({
     return () => {
       active = false;
     };
-  }, [color, initialized, onSelect, records]);
+  }, [color, icon, initialized, onSelect, records]);
 
   useEffect(() => {
     if (!map.current || !initialized) return;
@@ -175,12 +185,13 @@ export function RecordsMap({
       pickedMarker.current = null;
       if (!pickedPoint) return;
       pickedMarker.current = leaflet
-        .circleMarker([pickedPoint[1], pickedPoint[0]], {
-          radius: 9,
-          color: "#ffffff",
-          weight: 3,
-          fillColor: color,
-          fillOpacity: 1,
+        .marker([pickedPoint[1], pickedPoint[0]], {
+          icon: leaflet.divIcon({
+            className: "record-map-div-icon is-draft",
+            html: mapIconMarkerHtml(icon, color),
+            iconAnchor: [14, 14],
+            iconSize: [28, 28],
+          }),
         })
         .bindTooltip("Ubicación seleccionada")
         .addTo(map.current);
@@ -188,7 +199,7 @@ export function RecordsMap({
     return () => {
       active = false;
     };
-  }, [color, initialized, pickedPoint]);
+  }, [color, icon, initialized, pickedPoint]);
 
   return (
     <div

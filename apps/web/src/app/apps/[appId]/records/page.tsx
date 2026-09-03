@@ -216,6 +216,7 @@ export default function RecordsPage() {
           <RecordsMap
             appId={appId}
             color={app.mapColor}
+            icon={app.mapIcon}
             onPick={setDraftPoint}
             onRecords={setRecords}
             onSelect={openEditor}

@@ -78,9 +78,17 @@ body {
   place-items: center;
   width: 3rem;
   height: 3rem;
-  color: var(--brand);
-  background: #e8eff7;
-  font-size: 1.5rem;
+  border: 1px solid #dce3e8;
+  background: #f7f9fa;
+}
+.app-row-icon svg {
+  width: 1.7rem;
+  height: 1.7rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .app-row h2,
 .app-row p {
@@ -359,6 +367,73 @@ body {
   align-items: center;
   gap: 0.45rem;
 }
+.map-symbol-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.map-symbol-fieldset legend {
+  margin-bottom: 0.4rem;
+  color: #40505e;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.map-symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+.map-symbol-option {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0.35rem;
+  border: 1px solid #d7dfe5;
+  border-radius: 0.25rem;
+  background: #fff;
+  cursor: pointer;
+}
+.map-symbol-option:hover {
+  border-color: #8aa9bd;
+  background: #f3f7fa;
+}
+.map-symbol-option[aria-pressed="true"] {
+  border-color: var(--brand-dark);
+  outline: 2px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  outline-offset: 1px;
+  background: #edf4f8;
+}
+.map-symbol-option:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.map-symbol-option svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.map-color-control {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+}
+.properties-form .map-color-control input[type="color"] {
+  width: 3rem;
+  height: 2.25rem;
+  padding: 0.2rem;
+  cursor: pointer;
+}
+.map-color-control output {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
 .field-editor,
 .rules-dialog {
   width: min(100%, 32rem);
@@ -462,6 +537,33 @@ body {
 .leaflet-records-map.is-picking,
 .leaflet-records-map.is-picking .leaflet-interactive {
   cursor: crosshair;
+}
+.record-map-div-icon {
+  border: 0;
+  background: transparent;
+}
+.record-map-symbol {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px #25313d55;
+}
+.record-map-symbol svg {
+  width: 82%;
+  height: 82%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+.record-map-div-icon.is-draft .record-map-symbol {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 .records-table {
   overflow: auto;
