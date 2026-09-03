@@ -6,6 +6,7 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import { z } from "zod";
+import multipart from "@fastify/multipart";
 
 import { AppModule } from "./app.module.js";
 
@@ -20,6 +21,10 @@ async function bootstrap(): Promise<void> {
     AppModule,
     new FastifyAdapter(),
   );
+
+  await application.register(multipart, {
+    limits: { files: 1, fileSize: 50 * 1024 * 1024, fields: 0, parts: 1 },
+  });
 
   application.enableCors({
     origin: environment.WEB_ORIGIN,

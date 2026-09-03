@@ -130,4 +130,92 @@ export const migrations: readonly Migration[] = [
         );
     `,
   },
+  {
+    id: "0006_gis_import_jobs",
+    up: `
+      CREATE TABLE import_profiles (
+        code text NOT NULL CHECK (code ~ '^[A-Z][A-Z0-9_]{1,63}$'),
+        version integer NOT NULL CHECK (version > 0),
+        configuration jsonb NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (code, version)
+      );
+
+      INSERT INTO import_profiles (code, version, configuration) VALUES (
+        'TIGO_HFC_FTTH_V1',
+        1,
+        '{
+          "classifierField": "_status",
+          "externalIdField": "_record_id",
+          "routes": {
+            "POSTES": "POSTES",
+            "TAPS": "TAPS",
+            "TAP SATURADO": "TAPS",
+            "TAP SOBRECARGADO": "TAPS",
+            "DIVISORES": "DIVISORES",
+            "EDIFICIOS": "EDIFICIOS",
+            "AMPLIFICADORES": "AMPLIFICADORES",
+            "NODO": "NODOS",
+            "XBOX": "XBOX",
+            "MEC": "MEC"
+          }
+        }'::jsonb
+      );
+
+      CREATE TABLE import_jobs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        profile_code text NOT NULL,
+        profile_version integer NOT NULL,
+        import_scope text NOT NULL DEFAULT 'standalone'
+          CHECK (import_scope IN ('standalone', 'project', 'app')),
+        project_id uuid REFERENCES projects(id) ON DELETE RESTRICT,
+        target_app_id uuid REFERENCES app_definitions(id) ON DELETE RESTRICT,
+        status text NOT NULL CHECK (status IN ('inspected', 'importing', 'completed', 'failed')),
+        source_file_name text NOT NULL,
+        source_layer text NOT NULL,
+        source_checksum_sha256 text NOT NULL CHECK (source_checksum_sha256 ~ '^[0-9a-f]{64}$'),
+        archive_path text NOT NULL,
+        source_crs_wkt text NOT NULL,
+        source_epsg integer,
+        feature_count integer NOT NULL CHECK (feature_count > 0),
+        summary jsonb NOT NULL,
+        result jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        completed_at timestamptz,
+        FOREIGN KEY (profile_code, profile_version)
+          REFERENCES import_profiles(code, version),
+        CONSTRAINT import_jobs_scope_target_check CHECK (
+          (import_scope = 'standalone' AND project_id IS NULL AND target_app_id IS NULL)
+          OR (import_scope = 'project' AND project_id IS NOT NULL AND target_app_id IS NULL)
+          OR (import_scope = 'app' AND project_id IS NULL AND target_app_id IS NOT NULL)
+        )
+      );
+
+      CREATE TABLE record_import_sources (
+        record_id uuid PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
+        profile_code text NOT NULL,
+        profile_version integer NOT NULL,
+        source_record_id text NOT NULL,
+        source_status text NOT NULL,
+        import_job_id uuid NOT NULL REFERENCES import_jobs(id) ON DELETE RESTRICT,
+        source_file_name text NOT NULL,
+        source_layer text NOT NULL,
+        source_crs_wkt text NOT NULL,
+        original_attributes jsonb NOT NULL,
+        original_geometry jsonb NOT NULL,
+        imported_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (profile_code, profile_version, source_record_id),
+        FOREIGN KEY (profile_code, profile_version)
+          REFERENCES import_profiles(code, version)
+      );
+
+      CREATE INDEX import_jobs_project_idx ON import_jobs (project_id, created_at DESC);
+      CREATE INDEX record_import_sources_job_idx ON record_import_sources (import_job_id);
+    `,
+    down: `
+      DROP TABLE IF EXISTS record_import_sources;
+      DROP TABLE IF EXISTS import_jobs;
+      DROP TABLE IF EXISTS import_profiles;
+    `,
+  },
 ];

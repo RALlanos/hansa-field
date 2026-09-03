@@ -39,8 +39,11 @@ describe("foundation database migration", () => {
       "app_definitions",
       "app_versions",
       "hansa_field_migrations",
+      "import_jobs",
+      "import_profiles",
       "project_apps",
       "projects",
+      "record_import_sources",
       "records",
     ]);
 
@@ -72,6 +75,34 @@ describe("foundation database migration", () => {
     );
     expect(record.rows[0]?.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(record.rows[0]?.geometry_type).toBe("POINT");
+
+    const importJob = await client.query<{ id: string }>(
+      `INSERT INTO import_jobs (
+         profile_code, profile_version, import_scope, project_id, status, source_file_name,
+         source_layer, source_checksum_sha256, archive_path, source_crs_wkt,
+         source_epsg, feature_count, summary
+       ) VALUES (
+         'TIGO_HFC_FTTH_V1', 1, 'project', $1, 'inspected', 'tigo.zip', 'tigo',
+         repeat('a', 64), 'var/imports/source.zip', 'WGS 84', 4326, 1, '{}'
+       ) RETURNING id`,
+      [project.rows[0]?.id],
+    );
+    await client.query(
+      `INSERT INTO record_import_sources (
+         record_id, profile_code, profile_version, source_record_id,
+         source_status, import_job_id, source_file_name, source_layer,
+         source_crs_wkt, original_attributes, original_geometry
+       ) VALUES ($1, 'TIGO_HFC_FTTH_V1', 1, $2, 'POSTES', $3,
+         'tigo.zip', 'tigo', 'WGS 84', '{"_status":"POSTES"}',
+         '{"type":"Point","coordinates":[-68.15,-16.5]}')`,
+      [record.rows[0]?.id, "fulcrum-record-1", importJob.rows[0]?.id],
+    );
+    expect(
+      await client.query<{ source_record_id: string }>(
+        `SELECT source_record_id FROM record_import_sources WHERE record_id = $1`,
+        [record.rows[0]?.id],
+      ),
+    ).toMatchObject({ rows: [{ source_record_id: "fulcrum-record-1" }] });
 
     const remainingGeometryTypes = await client.query<{
       geometry_type: string;
