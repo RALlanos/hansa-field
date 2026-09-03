@@ -23,7 +23,13 @@ test("navega al flujo básico de importación", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Nueva importación" }),
   ).toBeVisible();
-  await expect(page.getByText("Seleccionar archivo GeoJSON")).toBeVisible();
+  await expect(page.getByText("Seleccionar Shapefile ZIP")).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Progreso de importación" }),
+  ).toContainText("Seleccionar tablas");
+  await expect(
+    page.getByRole("list", { name: "Progreso de importación" }),
+  ).toContainText("Mapear campos");
 });
 
 test("ubica un registro nuevo haciendo clic en el mapa y muestra sus atributos", async ({

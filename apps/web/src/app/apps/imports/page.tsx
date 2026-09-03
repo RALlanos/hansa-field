@@ -1,5 +1,5 @@
-import { TransferWorkspace } from "../../../features/transfers/transfer-workspace";
+import { ShapefileImportWorkspace } from "../../../features/transfers/shapefile-import-workspace";
 
 export default function ImportsPage() {
-  return <TransferWorkspace mode="import" />;
+  return <ShapefileImportWorkspace />;
 }
