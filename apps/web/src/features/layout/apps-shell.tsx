@@ -17,7 +17,10 @@ export function AppsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const moduleIsActive = modules.some((item) => pathname.startsWith(item.href));
   const appsIsActive =
-    pathname === "/apps" || (pathname.startsWith("/apps/") && !moduleIsActive);
+    pathname === "/apps" ||
+    (pathname.startsWith("/apps/") &&
+      !moduleIsActive &&
+      !pathname.startsWith("/apps/blocks"));
 
   return (
     <div className={collapsed ? "apps-shell is-collapsed" : "apps-shell"}>
@@ -48,6 +51,13 @@ export function AppsShell({ children }: { children: ReactNode }) {
           >
             <span aria-hidden="true">▦</span>
             <span>Apps</span>
+          </Link>
+          <Link
+            className={`apps-navigation-link ${pathname.startsWith("/apps/blocks") ? "is-active" : ""}`}
+            href="/apps/blocks"
+          >
+            <span aria-hidden="true">▤</span>
+            <span>Cajones de Apps</span>
           </Link>
           <p>GESTIÓN</p>
           {modules.map((item) => (

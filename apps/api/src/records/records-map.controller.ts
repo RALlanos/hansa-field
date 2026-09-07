@@ -18,7 +18,8 @@ const boundsSchema = z
   ])
   .refine(([west, south, east, north]) => west < east && south < north);
 const zoomSchema = z.coerce.number().int().min(0).max(22);
-const appIdsSchema = z.array(z.string().uuid()).min(1).max(50);
+const projectAppIdsSchema = z.array(z.string().uuid()).min(1).max(50);
+const projectIdSchema = z.string().uuid();
 
 @Controller("map/records")
 export class RecordsMapController {
@@ -30,14 +31,23 @@ export class RecordsMapController {
   async list(
     @Query("bbox") bbox?: string,
     @Query("zoom") zoom?: string,
-    @Query("appIds") appIds?: string,
+    @Query("projectAppIds") projectAppIds?: string,
+    @Query("projectId") projectId?: string,
   ) {
     const parsedBounds = boundsSchema.safeParse(bbox?.split(","));
     const parsedZoom = zoomSchema.safeParse(zoom);
-    const parsedAppIds = appIds
-      ? appIdsSchema.safeParse(appIds.split(","))
+    const parsedProjectAppIds = projectAppIds
+      ? projectAppIdsSchema.safeParse(projectAppIds.split(","))
       : { success: true as const, data: undefined };
-    if (!parsedBounds.success || !parsedZoom.success || !parsedAppIds.success) {
+    const parsedProjectId = projectId
+      ? projectIdSchema.safeParse(projectId)
+      : { success: true as const, data: undefined };
+    if (
+      !parsedBounds.success ||
+      !parsedZoom.success ||
+      !parsedProjectAppIds.success ||
+      !parsedProjectId.success
+    ) {
       throw new UnprocessableEntityException({
         code: "INVALID_MAP_QUERY",
         message:
@@ -47,7 +57,8 @@ export class RecordsMapController {
     return this.recordsService.listMapFeatures({
       bounds: parsedBounds.data,
       zoom: parsedZoom.data,
-      ...(parsedAppIds.data ? { appIds: parsedAppIds.data } : {}),
+      ...(parsedProjectAppIds.data ? { appIds: parsedProjectAppIds.data } : {}),
+      ...(parsedProjectId.data ? { projectId: parsedProjectId.data } : {}),
     });
   }
 }

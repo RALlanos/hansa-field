@@ -19,7 +19,7 @@ const projectSchema = z
       .regex(/^[A-Z][A-Z0-9_]{1,63}$/),
     name: z.string().trim().min(2).max(120),
     description: z.string().trim().max(1000).default(""),
-    appIds: z.array(z.string().uuid()).max(100).default([]),
+    blockIds: z.array(z.string().uuid()).max(100).default([]),
   })
   .strict();
 

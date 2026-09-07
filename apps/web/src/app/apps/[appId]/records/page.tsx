@@ -1,462 +1,280 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
+import { MultiAppMap } from "../../../../features/maps/multi-app-map";
 import {
-  RecordsMap,
-  type MapRecord,
-} from "../../../../features/records/records-map";
+  RecordsWorkspace,
+  type RecordsWorkspaceApp,
+} from "../../../../features/records/records-workspace";
 
-type Field = {
-  id: string;
-  key: string;
-  label: string;
-  type: string;
-  required: boolean;
-  options?: string[];
-  description?: string;
-  hidden?: boolean;
-  visibility?: {
-    match: "all" | "any";
-    conditions: Array<{ fieldId: string; operator: string; value?: string }>;
-  };
+type ProjectApp = RecordsWorkspaceApp & {
+  projectId: string;
+  projectName: string;
 };
-type AppSchema = {
-  sections: Array<{ id: string; title: string; fields: Field[] }>;
+type Column = { id: string; label: string; keys: Record<string, string> };
+type Metadata = { name: string; projectApps: ProjectApp[]; columns: Column[] };
+type Participation = {
+  recordUuid: string;
+  projectRecordUuid: string;
+  projectAppId: string;
+  projectId: string;
+  projectName: string;
+  appName: string;
+  attributes: Record<string, unknown>;
 };
-type App = { name: string; code: string; mapColor: string; mapIcon: string };
-type RecordItem = MapRecord;
-type Mode = "map" | "split" | "table";
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
-
-function visible(
-  field: Field,
-  fields: Field[],
-  values: Record<string, unknown>,
-): boolean {
-  if (field.hidden) return false;
-  const rules = field.visibility;
-  if (!rules?.conditions.length) return true;
-  const result = rules.conditions.map((condition) => {
-    const source = fields.find((item) => item.id === condition.fieldId);
-    const rawValue = source ? values[source.key] : undefined;
-    const value = Array.isArray(rawValue)
-      ? rawValue.join(",")
-      : String(rawValue ?? "");
-    if (condition.operator === "isEmpty") return value.length === 0;
-    if (condition.operator === "isNotEmpty") return value.length > 0;
-    if (condition.operator === "notEquals")
-      return value !== (condition.value ?? "");
-    return value === (condition.value ?? "");
-  });
-  return rules.match === "all" ? result.every(Boolean) : result.some(Boolean);
+type Result = { data: Participation[]; totalRecords: number };
+const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
+const ignoreStatus = () => {};
+function valueText(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Sí" : "No";
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
-
 export default function RecordsPage() {
   const { appId } = useParams<{ appId: string }>();
-  const [app, setApp] = useState<App | null>(null);
-  const [schema, setSchema] = useState<AppSchema>({ sections: [] });
-  const [records, setRecords] = useState<RecordItem[]>([]);
-  const [mode, setMode] = useState<Mode>("split");
-  const [editor, setEditor] = useState<RecordItem | "new" | null>(null);
-  const [draftPoint, setDraftPoint] = useState<[number, number] | null>(null);
-  const [formValues, setFormValues] = useState<Record<string, unknown>>({});
-  const [message, setMessage] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [project, setProject] = useState("");
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState<Result>({ data: [], totalRecords: 0 });
   const [loading, setLoading] = useState(true);
-
+  const [error, setError] = useState("");
   useEffect(() => {
-    Promise.all([
-      fetch(`${apiUrl}/api/apps/${appId}`).then(
-        (response) => response.json() as Promise<App>,
-      ),
-      fetch(`${apiUrl}/api/apps/${appId}/versions/latest`).then(
-        (response) => response.json() as Promise<{ schema: AppSchema } | null>,
-      ),
-      fetch(`${apiUrl}/api/apps/${appId}/records`).then(
-        (response) => response.json() as Promise<{ data: RecordItem[] }>,
-      ),
-    ])
-      .then(([currentApp, version, items]) => {
-        setApp(currentApp);
-        setSchema(version?.schema ?? { sections: [] });
-        setRecords(items.data);
+    const controller = new AbortController();
+    setError("");
+    setMetadata(null);
+    void fetch(`${api}/api/apps/${appId}/records/metadata`, {
+      signal: controller.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("No se pudo cargar la App.");
+        return r.json() as Promise<Metadata>;
       })
-      .catch(() => setMessage("No se pudieron cargar los registros."))
-      .finally(() => setLoading(false));
-  }, [appId]);
-
-  const fields = useMemo(
-    () => schema.sections.flatMap((section) => section.fields),
-    [schema],
-  );
-  function openEditor(record: RecordItem | "new") {
-    setEditor(record);
-    setFormValues(record === "new" ? {} : record.attributes);
-    setDraftPoint(
-      record !== "new" && record.geometry?.type === "Point"
-        ? record.geometry.coordinates
-        : null,
-    );
-  }
-  function closeEditor() {
-    setEditor(null);
-    setDraftPoint(null);
-    setFormValues({});
-  }
-  function changeField(key: string, value: unknown) {
-    setFormValues((current) => ({ ...current, [key]: value }));
-  }
-  async function saveRecord(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const attributes = Object.fromEntries(
-      fields.map((field) => {
-        if (field.type === "boolean") return [field.key, form.has(field.key)];
-        if (field.type === "multipleChoice")
-          return [field.key, form.getAll(field.key).map(String)];
-        const value = String(form.get(field.key) ?? "");
-        if (field.type === "number")
-          return [field.key, value === "" ? null : Number(value)];
-        return [field.key, value];
-      }),
-    );
-    const geometry = draftPoint
-      ? { type: "Point" as const, coordinates: draftPoint }
-      : null;
-    const isNew = editor === "new";
-    const url = isNew
-      ? `${apiUrl}/api/apps/${appId}/records`
-      : `${apiUrl}/api/apps/${appId}/records/${editor?.id}`;
-    try {
-      const response = await fetch(url, {
-        method: isNew ? "POST" : "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ attributes, geometry }),
+      .then((data) => {
+        setMetadata(data);
+        setSelected(data.projectApps.map((a) => a.id));
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted)
+          setError(e instanceof Error ? e.message : "Error al cargar la App.");
       });
-      if (!response.ok) throw new Error("No se pudo guardar el registro.");
-      const saved = (await response.json()) as RecordItem;
-      setRecords((current) =>
-        isNew
-          ? [saved, ...current]
-          : current.map((item) => (item.id === saved.id ? saved : item)),
-      );
-      closeEditor();
-      setMessage(isNew ? "Registro creado." : "Registro actualizado.");
-    } catch (reason) {
-      setMessage(
-        reason instanceof Error
-          ? reason.message
-          : "No se pudo guardar el registro.",
-      );
+    return () => controller.abort();
+  }, [appId]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebounced(search);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const apps = useMemo(
+    () =>
+      metadata?.projectApps.filter(
+        (a) => !project || a.projectId === project,
+      ) ?? [],
+    [metadata, project],
+  );
+  const ids = apps
+    .filter((a) => selected.includes(a.id))
+    .map((a) => a.id)
+    .join(",");
+  const filters = useMemo(
+    () =>
+      new URLSearchParams({
+        projectAppIds: ids,
+        search: debounced,
+        ...(project ? { projectId: project } : {}),
+      }).toString(),
+    [ids, debounced, project],
+  );
+  useEffect(() => {
+    if (!metadata) return;
+    const controller = new AbortController();
+    if (!ids) {
+      setResult({ data: [], totalRecords: 0 });
+      setLoading(false);
+      return;
     }
-  }
-  if (loading)
-    return <main className="builder-loading">Cargando registros…</main>;
-  if (!app)
+    setLoading(true);
+    setError("");
+    void fetch(
+      `${api}/api/apps/${appId}/records?${filters}&page=${page}&pageSize=50`,
+      { signal: controller.signal },
+    )
+      .then(async (r) => {
+        if (!r.ok)
+          throw new Error("No se pudieron cargar las participaciones.");
+        return r.json() as Promise<Result>;
+      })
+      .then(setResult)
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted)
+          setError(
+            e instanceof Error ? e.message : "Error al cargar registros.",
+          );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [appId, filters, page, metadata, ids]);
+  if (!metadata)
     return (
-      <main className="builder-loading" role="alert">
-        {message ?? "No se encontró la App."}
+      <main className="builder-loading" role={error ? "alert" : "status"}>
+        {error || "Cargando App…"}
       </main>
     );
+  const projects = [
+    ...new Map(
+      metadata.projectApps.map((a) => [a.projectId, a.projectName]),
+    ).entries(),
+  ];
+  const columns = metadata.columns.filter((c) =>
+    apps.some((a) => selected.includes(a.id) && c.keys[a.id]),
+  );
   return (
-    <main className="records-page">
-      <header className="builder-header">
-        <Link href={`/apps/${appId}`}>← Configurar App</Link>
-        <div>
-          <p className="eyebrow">Registros</p>
-          <h1>{app.name}</h1>
-        </div>
-        <p className="builder-code">{records.length} registros</p>
-        <div className="view-switch" aria-label="Modo de visualización">
-          <button
-            aria-pressed={mode === "map"}
-            onClick={() => setMode("map")}
-            type="button"
-          >
-            Mapa
-          </button>
-          <button
-            aria-pressed={mode === "split"}
-            onClick={() => setMode("split")}
-            type="button"
-          >
-            Mitad
-          </button>
-          <button
-            aria-pressed={mode === "table"}
-            onClick={() => setMode("table")}
-            type="button"
-          >
-            Tabla
-          </button>
-        </div>
-        <button
-          className="primary-button"
-          onClick={() => openEditor("new")}
-          type="button"
-        >
-          + Nuevo registro
-        </button>
-      </header>
-      {message && (
-        <p className="builder-message" role="status">
-          {message}
-        </p>
-      )}
-      {!schema.sections.length && (
-        <p className="records-notice">
-          Esta App todavía no tiene atributos. Puedes crear un punto con
-          ubicación o configurar su formulario antes de continuar.
-        </p>
-      )}
-      <div className={`records-view ${mode}`}>
-        <section className="records-map" aria-label="Mapa de registros">
-          <RecordsMap
-            appId={appId}
-            color={app.mapColor}
-            icon={app.mapIcon}
-            onPick={setDraftPoint}
-            onRecords={setRecords}
-            onSelect={openEditor}
-            pickedPoint={draftPoint}
-            picking={editor !== null}
-            records={records}
-          />
-        </section>
-        <section className="records-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Registro</th>
-                {fields.slice(0, 4).map((field) => (
-                  <th key={field.id}>{field.label}</th>
+    <RecordsWorkspace
+      title={metadata.name}
+      contextLabel="Registros consolidados · una fila por participación"
+      backHref="/apps"
+      backLabel="Apps"
+      totalRecords={result.totalRecords}
+      apps={apps.map((a) => ({ ...a, name: `${a.name} · ${a.projectName}` }))}
+      selectedIds={selected.filter((id) => apps.some((a) => a.id === id))}
+      onSelectedIdsChange={(ids) => {
+        setSelected(ids);
+        setPage(1);
+      }}
+      message={
+        <>
+          <div className="consolidated-filters">
+            <label>
+              Proyecto
+              <select
+                value={project}
+                onChange={(e) => {
+                  setProject(e.target.value);
+                  setSelected(
+                    metadata.projectApps
+                      .filter(
+                        (a) =>
+                          !e.target.value || a.projectId === e.target.value,
+                      )
+                      .map((a) => a.id),
+                  );
+                  setPage(1);
+                }}
+              >
+                <option value="">Todos los proyectos</option>
+                {projects.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
                 ))}
-                <th>Ubicación</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((record) => (
-                <tr key={record.id}>
-                  <td>{record.id.slice(0, 8)}</td>
-                  {fields.slice(0, 4).map((field) => (
-                    <td key={field.id}>
-                      {String(record.attributes[field.key] ?? "—")}
-                    </td>
+              </select>
+            </label>
+            <label>
+              Buscar registros
+              <input
+                type="search"
+                value={search}
+                maxLength={250}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Atributos o UUID del registro"
+              />
+            </label>
+            <span>
+              Vista de consulta. Cada fila conserva los valores de su proyecto.
+            </span>
+          </div>
+          {error && <p role="alert">{error}</p>}
+        </>
+      }
+      map={
+        <MultiAppMap
+          appIds={ids ? ids.split(",") : []}
+          onStatus={ignoreStatus}
+          endpoint={`${api}/api/apps/${appId}/records/map`}
+          search={debounced}
+          {...(project ? { projectId: project } : {})}
+        />
+      }
+      table={
+        <>
+          <div aria-busy={loading}>
+            {loading && <p role="status">Cargando participaciones…</p>}
+            <table>
+              <thead>
+                <tr>
+                  <th>Proyecto</th>
+                  <th>Project App</th>
+                  <th>Registro Hansa</th>
+                  {columns.map((c) => (
+                    <th key={c.id} title={`Identidad de campo: ${c.id}`}>
+                      {c.label}
+                      {columns.filter((x) => x.label === c.label).length > 1
+                        ? ` (${c.id.slice(0, 8)})`
+                        : ""}
+                    </th>
                   ))}
-                  <td>{record.geometry ? "Punto" : "Sin ubicación"}</td>
-                  <td>
-                    <button
-                      className="row-action"
-                      onClick={() => openEditor(record)}
-                      type="button"
-                    >
-                      Editar
-                    </button>
-                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {records.length === 0 && (
-            <p className="records-empty">
-              Aún no hay registros. Crea el primero manualmente.
-            </p>
-          )}
-        </section>
-      </div>
-      {editor && (
-        <div className="modal-backdrop record-editor-backdrop">
-          <form
-            aria-label="Editor de registro"
-            className="record-editor"
-            onSubmit={saveRecord}
-          >
-            <div className="form-heading">
-              <h2>{editor === "new" ? "Nuevo registro" : "Editar registro"}</h2>
-              <button
-                aria-label="Cerrar"
-                className="icon-button"
-                onClick={closeEditor}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
-            {schema.sections.map((section) => (
-              <fieldset key={section.id}>
-                <legend>{section.title}</legend>
-                {section.fields
-                  .filter((field) => visible(field, fields, formValues))
-                  .map((field) => (
-                    <label key={field.id}>
-                      <span>
-                        {field.label}
-                        {field.required ? " *" : ""}
-                      </span>
-                      {field.type === "boolean" ? (
-                        <input
-                          defaultChecked={Boolean(
-                            editor !== "new" && editor.attributes[field.key],
+              </thead>
+              <tbody>
+                {result.data.map((row) => (
+                  <tr
+                    key={row.projectRecordUuid}
+                    data-participation={row.projectRecordUuid}
+                  >
+                    <td>{row.projectName}</td>
+                    <td>{row.appName}</td>
+                    <td title={`Participación: ${row.projectRecordUuid}`}>
+                      <code>{row.recordUuid}</code>
+                    </td>
+                    {columns.map((c) => {
+                      const key = c.keys[row.projectAppId];
+                      return (
+                        <td key={c.id}>
+                          {key === undefined ? (
+                            <span title="No aplica en este proyecto">N/A</span>
+                          ) : (
+                            valueText(row.attributes[key])
                           )}
-                          name={field.key}
-                          onChange={(event) =>
-                            changeField(field.key, event.target.checked)
-                          }
-                          type="checkbox"
-                        />
-                      ) : field.type === "longText" ? (
-                        <textarea
-                          defaultValue={
-                            editor === "new"
-                              ? ""
-                              : String(editor.attributes[field.key] ?? "")
-                          }
-                          name={field.key}
-                          onChange={(event) =>
-                            changeField(field.key, event.target.value)
-                          }
-                          required={field.required}
-                        />
-                      ) : field.type === "singleChoice" ? (
-                        <select
-                          defaultValue={
-                            editor === "new"
-                              ? ""
-                              : String(editor.attributes[field.key] ?? "")
-                          }
-                          name={field.key}
-                          onChange={(event) =>
-                            changeField(field.key, event.target.value)
-                          }
-                          required={field.required}
-                        >
-                          <option value="">Selecciona…</option>
-                          {(field.options ?? []).map((option) => (
-                            <option key={option}>{option}</option>
-                          ))}
-                        </select>
-                      ) : field.type === "multipleChoice" ? (
-                        <select
-                          defaultValue={
-                            editor === "new"
-                              ? []
-                              : Array.isArray(editor.attributes[field.key])
-                                ? (editor.attributes[field.key] as string[])
-                                : []
-                          }
-                          multiple
-                          name={field.key}
-                          onChange={(event) =>
-                            changeField(
-                              field.key,
-                              Array.from(
-                                event.currentTarget.selectedOptions,
-                                (option) => option.value,
-                              ),
-                            )
-                          }
-                          required={field.required}
-                        >
-                          {(field.options ?? []).map((option) => (
-                            <option key={option}>{option}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          defaultValue={
-                            editor === "new"
-                              ? ""
-                              : String(editor.attributes[field.key] ?? "")
-                          }
-                          name={field.key}
-                          onChange={(event) =>
-                            changeField(
-                              field.key,
-                              field.type === "number"
-                                ? event.target.value === ""
-                                  ? null
-                                  : Number(event.target.value)
-                                : event.target.value,
-                            )
-                          }
-                          required={field.required}
-                          type={
-                            field.type === "number"
-                              ? "number"
-                              : field.type === "date"
-                                ? "date"
-                                : field.type === "time"
-                                  ? "time"
-                                  : "text"
-                          }
-                        />
-                      )}
-                      {field.description && <small>{field.description}</small>}
-                    </label>
-                  ))}
-              </fieldset>
-            ))}
-            <fieldset>
-              <legend>Ubicación del punto</legend>
-              <p className="map-pick-hint">
-                Haz clic en el mapa para ubicar el punto.
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!loading && !result.data.length && (
+              <p className="records-empty">
+                No hay participaciones activas para estos filtros.
               </p>
-              <label>
-                Longitud
-                <input
-                  onChange={(event) => {
-                    const longitude = Number(event.target.value);
-                    setDraftPoint((current) => [longitude, current?.[1] ?? 0]);
-                  }}
-                  name="longitude"
-                  placeholder="Selecciona en el mapa"
-                  step="any"
-                  type="number"
-                  value={draftPoint?.[0] ?? ""}
-                />
-              </label>
-              <label>
-                Latitud
-                <input
-                  onChange={(event) => {
-                    const latitude = Number(event.target.value);
-                    setDraftPoint((current) => [current?.[0] ?? 0, latitude]);
-                  }}
-                  name="latitude"
-                  placeholder="Selecciona en el mapa"
-                  step="any"
-                  type="number"
-                  value={draftPoint?.[1] ?? ""}
-                />
-              </label>
-              {draftPoint && (
-                <button
-                  className="row-action clear-location"
-                  onClick={() => setDraftPoint(null)}
-                  type="button"
-                >
-                  Quitar ubicación
-                </button>
-              )}
-            </fieldset>
-            <div className="form-actions">
-              <button
-                className="secondary-button"
-                onClick={closeEditor}
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button className="primary-button" type="submit">
-                Guardar registro
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </main>
+            )}
+          </div>
+          <nav className="records-pagination" aria-label="Paginación">
+            <button
+              disabled={page === 1 || loading}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Anterior
+            </button>
+            <span>
+              Página {page} de{" "}
+              {Math.max(1, Math.ceil(result.totalRecords / 50))}
+            </span>
+            <button
+              disabled={page * 50 >= result.totalRecords || loading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </button>
+          </nav>
+        </>
+      }
+    />
   );
 }

@@ -27,11 +27,12 @@ async function bootstrap(): Promise<void> {
   });
 
   application.enableCors({
-    origin: environment.WEB_ORIGIN,
-    methods: ["GET", "POST", "PATCH"],
+    origin: ["http://localhost:3200", "http://192.168.100.34:3200"],
+    credentials: true,
   });
   application.setGlobalPrefix("api");
-  await application.listen(environment.API_PORT, "127.0.0.1");
+
+  await application.listen(environment.API_PORT, "0.0.0.0");
 }
 
 await bootstrap();

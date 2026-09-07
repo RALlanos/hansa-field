@@ -39,6 +39,10 @@ export function HomeSidebar({ collapsed, onToggle }: HomeSidebarProps) {
           <HomeIcon name="apps" />
           <span>Apps</span>
         </Link>
+        <Link className="home-nav-link" href="/apps/blocks">
+          <HomeIcon name="apps" />
+          <span>Cajones de Apps</span>
+        </Link>
         <p>PRÓXIMAMENTE</p>
         {futureModules.map((item) => (
           <span

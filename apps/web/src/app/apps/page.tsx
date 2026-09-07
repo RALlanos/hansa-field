@@ -13,7 +13,10 @@ type AppSummary = {
   mapIcon: string;
   mapColor: string;
 };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3100";
+const apiUrl =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3100`
+    : "http://localhost:3100";
 
 export default function AppsPage() {
   const [apps, setApps] = useState<AppSummary[]>([]);
@@ -29,6 +32,14 @@ export default function AppsPage() {
       .then(({ data }) => setApps(data))
       .catch(() => setError("No se pudieron cargar las Apps."));
   }, []);
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
   async function createApp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -75,16 +86,21 @@ export default function AppsPage() {
       <header className="catalog-header">
         <div>
           <p className="eyebrow">Aplicaciones</p>
-          <h1>Apps</h1>
+          <h1>Plantillas de aplicaciones</h1>
           <p>Define formularios reutilizables y sus registros maestros.</p>
         </div>
-        <button
-          className="primary-button"
-          onClick={() => setIsOpen(true)}
-          type="button"
-        >
-          Nueva App
-        </button>
+        <div className="catalog-header-actions">
+          <Link className="secondary-button" href="/apps/blocks">
+            Bloque de Aplicaciones
+          </Link>
+          <button
+            className="primary-button"
+            onClick={() => setIsOpen(true)}
+            type="button"
+          >
+            Nueva App
+          </button>
+        </div>
       </header>
       {error && (
         <p className="catalog-error" role="alert">
@@ -138,15 +154,26 @@ export default function AppsPage() {
               >
                 Ver registros
               </Link>
+              <Link
+                className="secondary-button app-configure-link"
+                href="/apps/projects"
+              >
+                Ver Proyectos
+              </Link>
             </article>
           ))
         )}
       </section>
       {isOpen && (
-        <div className="modal-backdrop" role="presentation">
+        <div
+          className="modal-backdrop"
+          onMouseDown={() => setIsOpen(false)}
+          role="presentation"
+        >
           <form
             aria-labelledby="new-app-title"
             className="app-form"
+            onMouseDown={(event) => event.stopPropagation()}
             onSubmit={createApp}
           >
             <div className="form-heading">

@@ -237,7 +237,7 @@ export default function AppBuilderPage() {
           className="secondary-button app-configure-link"
           href={`/apps/${appId}/records`}
         >
-          View records
+          Ver registros
         </Link>
         <button
           className="primary-button"

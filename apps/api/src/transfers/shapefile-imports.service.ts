@@ -43,9 +43,7 @@ type ImportJobRow = Readonly<{
   id: string;
   profile_code: string;
   profile_version: number;
-  import_scope: "standalone" | "project" | "app";
-  project_id: string | null;
-  target_app_id: string | null;
+  target_project_app_id: string;
   status: string;
   source_file_name: string;
   source_layer: string;
@@ -95,18 +93,15 @@ export class ShapefileImportsService {
     await writeFile(archivePath, archive, { flag: "wx" });
     await this.database.query(
       `INSERT INTO import_jobs (
-         id, profile_code, profile_version, import_scope, project_id,
-         target_app_id, status, source_file_name, source_layer,
+         id, profile_code, profile_version, target_project_app_id, status, source_file_name, source_layer,
          source_checksum_sha256, archive_path, source_crs_wkt, source_epsg,
          feature_count, summary
-       ) VALUES ($1, $2, $3, $4, $5, $6, 'inspected', $7, $8, $9, $10, $11, $12, $13, $14)`,
+       ) VALUES ($1, $2, $3, $4, 'inspected', $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         jobId,
         inspection.profile.code,
         inspection.profile.version,
-        scope.type,
-        scope.type === "project" ? scope.projectId : null,
-        scope.type === "app" ? scope.appId : null,
+        await this.resolveTargetProjectAppId(scope),
         inspection.sourceFileName,
         inspection.layerName,
         inspection.checksumSha256,
@@ -138,6 +133,21 @@ export class ShapefileImportsService {
       }),
       availableApps,
     };
+  }
+
+  private async resolveTargetProjectAppId(scope: ImportScope): Promise<string> {
+    if (scope.type === "app") return scope.appId;
+    if (scope.type === "project") {
+      const result = await this.database.query<{ id: string }>(
+        "SELECT id FROM project_apps WHERE project_id = $1 ORDER BY created_at LIMIT 1",
+        [scope.projectId],
+      );
+      if (result.rows[0]) return result.rows[0].id;
+    }
+    throw new UnprocessableEntityException({
+      code: "PROJECT_APP_REQUIRED",
+      message: "Selecciona un Proyecto con una App de Proyecto para importar.",
+    });
   }
 
   async plan(jobId: string, selection: ImportSelection) {
@@ -182,13 +192,6 @@ export class ShapefileImportsService {
         "UPDATE import_jobs SET status = 'importing' WHERE id = $1",
         [jobId],
       );
-      if (prepared.job.import_scope === "project" && prepared.job.project_id) {
-        await transaction.query(
-          `INSERT INTO project_apps (project_id, app_id)
-           SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`,
-          [prepared.job.project_id, prepared.apps.map((app) => app.id)],
-        );
-      }
       for (let offset = 0; offset < prepared.rows.length; offset += 250) {
         await this.persistBatch(
           transaction,
@@ -262,14 +265,6 @@ export class ShapefileImportsService {
         ),
       ),
     ];
-    if (
-      job.import_scope === "app" &&
-      targetAppIds.some((appId) => appId !== job.target_app_id)
-    ) {
-      errors.push({
-        message: "Una importación desde una App sólo puede usar esa App.",
-      });
-    }
     const apps = await this.loadAppContracts(targetAppIds);
     if (apps.length !== targetAppIds.length) {
       errors.push({ message: "Una de las Apps seleccionadas ya no existe." });
@@ -540,8 +535,8 @@ export class ShapefileImportsService {
 
   private async loadJob(jobId: string): Promise<ImportJobRow> {
     const result = await this.database.query<ImportJobRow>(
-      `SELECT id, profile_code, profile_version, import_scope, project_id,
-         target_app_id, status, source_file_name, source_layer,
+      `SELECT id, profile_code, profile_version, target_project_app_id,
+         status, source_file_name, source_layer,
          source_checksum_sha256, archive_path, source_crs_wkt
        FROM import_jobs WHERE id = $1`,
       [jobId],
@@ -586,13 +581,25 @@ export class ShapefileImportsService {
          SELECT * FROM jsonb_to_recordset($1::jsonb) AS row(
            "recordId" uuid, "appId" uuid, "appVersionId" uuid,
            attributes jsonb, geometry jsonb)
-       ) INSERT INTO records (id, app_id, app_version_id, attributes, geometry)
+       ) INSERT INTO records (
+         id, app_id, app_version_id, canonical_attributes, geometry
+       )
        SELECT "recordId", "appId", "appVersionId", attributes,
          ST_SetSRID(ST_GeomFromGeoJSON(geometry), 4326) FROM input
        ON CONFLICT (id) DO UPDATE SET app_id = EXCLUDED.app_id,
-         app_version_id = EXCLUDED.app_version_id, attributes = EXCLUDED.attributes,
+         app_version_id = EXCLUDED.app_version_id,
+         canonical_attributes = EXCLUDED.canonical_attributes,
          geometry = EXCLUDED.geometry, updated_at = now()`,
       [serialized],
+    );
+    await database.query(
+      `WITH input AS (
+         SELECT * FROM jsonb_to_recordset($1::jsonb) AS row("recordId" uuid)
+       ) INSERT INTO project_records (project_app_id, record_id)
+       SELECT $2::uuid, "recordId" FROM input
+       ON CONFLICT (project_app_id, record_id) WHERE status = 'active'
+       DO UPDATE SET updated_at = now()`,
+      [serialized, job.target_project_app_id],
     );
     await database.query(
       `WITH input AS (
@@ -602,10 +609,13 @@ export class ShapefileImportsService {
        ) INSERT INTO record_import_sources (
          record_id, profile_code, profile_version, source_record_id,
          source_status, import_job_id, source_file_name, source_layer,
-         source_crs_wkt, original_attributes, original_geometry)
-       SELECT "recordId", $2, $3, "sourceRecordId", "sourceStatus", $4,
-         $5, $6, $7, "originalAttributes", geometry FROM input
-       ON CONFLICT (profile_code, profile_version, source_record_id)
+         project_record_id, source_crs_wkt, original_attributes, original_geometry)
+       SELECT input."recordId", $2, $3, input."sourceRecordId", input."sourceStatus", $4,
+         $5, $6, participation.id, $7, input."originalAttributes", input.geometry
+       FROM input JOIN project_records participation
+         ON participation.record_id = input."recordId" AND participation.project_app_id = $8
+         AND participation.status = 'active'
+       ON CONFLICT (profile_code, profile_version, source_record_id, project_record_id)
        DO UPDATE SET source_status = EXCLUDED.source_status,
          import_job_id = EXCLUDED.import_job_id, source_file_name = EXCLUDED.source_file_name,
          source_layer = EXCLUDED.source_layer, source_crs_wkt = EXCLUDED.source_crs_wkt,
@@ -619,6 +629,7 @@ export class ShapefileImportsService {
         job.source_file_name,
         job.source_layer,
         job.source_crs_wkt,
+        job.target_project_app_id,
       ],
     );
   }
