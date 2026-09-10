@@ -85,7 +85,7 @@ async function readEntry(
   return Buffer.concat(chunks);
 }
 
-async function readShapefileParts(archive: Buffer) {
+export async function readShapefileParts(archive: Buffer) {
   const zip = await fromBufferPromise(archive, {
     decodeStrings: true,
     strictFileNames: true,

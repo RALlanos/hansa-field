@@ -26,3 +26,5 @@ export const recordInputSchema = z
     geometry: geometrySchema.nullable(),
   })
   .strict();
+
+export type GeoJsonGeometry = z.infer<typeof geometrySchema>;

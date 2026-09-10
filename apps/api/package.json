@@ -8,7 +8,7 @@
     "dev": "tsx watch --env-file=../../.env.example src/main.ts",
     "db:migrate": "tsx --env-file=../../.env.example src/database/migrate.ts up",
     "db:rollback": "tsx --env-file=../../.env.example src/database/migrate.ts down",
-    "start": "node dist/main.js",
+    "start": "node dist-active/main.js",
     "test": "vitest run",
     "test:unit": "vitest run --exclude src/database/migrator.spec.ts",
     "test:integration": "vitest run src/database/migrator.spec.ts",

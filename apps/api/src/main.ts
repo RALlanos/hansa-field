@@ -9,6 +9,7 @@ import { z } from "zod";
 import multipart from "@fastify/multipart";
 
 import { AppModule } from "./app.module.js";
+import { OperationalErrors } from "./datasets/operational-errors.js";
 
 const environmentSchema = z.object({
   API_PORT: z.coerce.number().int().min(1).max(65_535).default(3100),
@@ -31,8 +32,9 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
   application.setGlobalPrefix("api");
+  application.useGlobalFilters(new OperationalErrors());
 
-  await application.listen(environment.API_PORT, "0.0.0.0");
+  await application.listen(environment.API_PORT, "127.0.0.1");
 }
 
 await bootstrap();

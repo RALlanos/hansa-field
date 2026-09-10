@@ -13,10 +13,10 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "sourceMap": true,
-    "outDir": "dist",
+    "outDir": "dist-active",
     "rootDir": "src",
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "dist-active", "node_modules"]
 }

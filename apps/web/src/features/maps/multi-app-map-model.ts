@@ -1,34 +1,30 @@
 export type MapBounds = readonly [number, number, number, number];
+export type MapMode = "app" | "project" | "universal";
+
+export type MapScopeInput = Readonly<{
+  mode: MapMode;
+  appIds?: readonly string[];
+  projectIds?: readonly string[];
+  localCollectionIds?: readonly string[];
+  bbox: MapBounds;
+  zoom: number;
+  budget?: number;
+}>;
 
 export function buildMapRecordsUrl(
   apiUrl: string,
-  bounds: MapBounds,
-  zoom: number,
-  appIds: readonly string[],
-  projectId?: string,
+  scope: MapScopeInput,
 ): string {
   const parameters = new URLSearchParams({
-    bbox: bounds.map((value) => Number(value.toFixed(5))).join(","),
-    zoom: String(Math.round(zoom)),
+    mode: scope.mode,
+    bbox: scope.bbox.map((value) => Number(value.toFixed(5))).join(","),
+    zoom: String(Math.round(scope.zoom)),
+    budget: String(scope.budget ?? 2000),
   });
-  if (appIds.length) parameters.set("projectAppIds", appIds.join(","));
-  if (projectId) parameters.set("projectId", projectId);
-  return `${apiUrl}/api/map/records?${parameters.toString()}`;
-}
-
-export function buildProjectRecordsUrl(
-  apiUrl: string,
-  projectId: string,
-  appIds: readonly string[],
-  bounds: MapBounds,
-  page: number,
-  pageSize = 50,
-): string {
-  const parameters = new URLSearchParams({
-    projectAppIds: appIds.join(","),
-    bbox: bounds.map((value) => Number(value.toFixed(5))).join(","),
-    page: String(page),
-    pageSize: String(pageSize),
-  });
-  return `${apiUrl}/api/projects/${projectId}/records?${parameters.toString()}`;
+  if (scope.appIds?.length) parameters.set("appIds", scope.appIds.join(","));
+  if (scope.projectIds?.length)
+    parameters.set("projectIds", scope.projectIds.join(","));
+  if (scope.localCollectionIds?.length)
+    parameters.set("localCollectionIds", scope.localCollectionIds.join(","));
+  return `${apiUrl}/api/workspace/map?${parameters.toString()}`;
 }

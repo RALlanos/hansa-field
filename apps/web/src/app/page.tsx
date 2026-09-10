@@ -1,5 +1,5 @@
-import { FieldWorkspace } from "./field-workspace";
+import { OperationalWorkspace } from "../features/operational/workspace";
 
 export default function HomePage() {
-  return <FieldWorkspace />;
+  return <OperationalWorkspace />;
 }
