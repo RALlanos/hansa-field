@@ -1740,17 +1740,28 @@ body {
   border: 0;
 }
 .multi-map-cluster {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border: 2px solid #fff;
-  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 2.25rem;
+  height: 1.65rem;
+  padding: 0 0.38rem;
+  border: 1px solid color-mix(in srgb, var(--cluster-color), white 30%);
+  border-radius: 999px;
   color: #fff;
   background: var(--cluster-color);
   box-shadow: 0 0.2rem 0.55rem #14232d40;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.multi-map-cluster svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
 }
 @media (max-width: 760px) {
   .multi-map-header {

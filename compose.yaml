@@ -18,5 +18,38 @@ services:
       retries: 10
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      API_PORT: 3100
+      API_HOST: 0.0.0.0
+      WEB_ORIGIN: http://localhost:3200
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hansa_field}:${POSTGRES_PASSWORD:-change-me-local-only}@database:5432/${POSTGRES_DB:-hansa_field}
+    command: >
+      sh -c "pnpm --filter @hansa-field/api db:migrate && pnpm --filter @hansa-field/api start"
+    ports:
+      - "3100:3100"
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:3100
+    environment:
+      API_INTERNAL_URL: http://api:3100
+    ports:
+      - "3200:3200"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   hansa_field_postgres:

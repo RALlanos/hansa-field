@@ -1,0 +1,15 @@
+.git
+.vscode
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+dist-active
+coverage
+playwright-report
+test-results
+.env
+.env.local
+.env.*.local
+*.log

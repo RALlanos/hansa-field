@@ -73,7 +73,19 @@ const emptyStatus: MultiAppMapStatus = {
 
 function clusterMarkerHtml(feature: MapFeature): string {
   const color = normalizeMapColor(feature.symbol.color);
-  return `<span class="multi-map-cluster" style="--cluster-color:${color}"><b>${feature.count}</b></span>`;
+  const formattedCount =
+    feature.count >= 1_000_000
+      ? `${(feature.count / 1_000_000).toFixed(1)}M`
+      : feature.count >= 10_000
+        ? `${Math.round(feature.count / 1_000)}k`
+        : feature.count >= 1_000
+          ? `${(feature.count / 1_000).toFixed(1)}k`
+          : String(feature.count);
+  const icon = feature.symbol.icon;
+  return `<span class="multi-map-cluster" style="--cluster-color:${color}">
+    <svg aria-hidden="true" viewBox="0 0 24 24"><use href="/map-symbols.svg#map-icon-${icon}"></use></svg>
+    <b>${formattedCount}</b>
+  </span>`;
 }
 
 export function MultiAppMap({
@@ -113,9 +125,10 @@ export function MultiAppMap({
         .map(container.current, {
           maxZoom: 22,
           preferCanvas: true,
-          zoomControl: true,
+          zoomControl: false,
         })
         .setView([-16.7, -64.5], 5);
+      leaflet.control.zoom({ position: "bottomright" }).addTo(instance);
       leaflet
         .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "© OpenStreetMap contributors",
@@ -179,21 +192,21 @@ export function MultiAppMap({
       const nextLayer = leaflet.geoJSON(collection, {
         pointToLayer: (feature, latlng) => {
           const properties = feature.properties;
+          const isCluster =
+            properties.count > 1 || Boolean(properties.isCluster);
           return leaflet.marker(latlng, {
             icon: leaflet.divIcon({
-              className:
-                properties.count > 1
-                  ? "multi-map-cluster-icon"
-                  : "record-map-div-icon",
-              html:
-                properties.count > 1
-                  ? clusterMarkerHtml(properties)
-                  : mapIconMarkerHtml(
-                      properties.symbol.icon,
-                      properties.symbol.color,
-                    ),
-              iconAnchor: properties.count > 1 ? [16, 16] : [11, 11],
-              iconSize: properties.count > 1 ? [32, 32] : [22, 22],
+              className: isCluster
+                ? "multi-map-cluster-icon"
+                : "record-map-div-icon",
+              html: isCluster
+                ? clusterMarkerHtml(properties)
+                : mapIconMarkerHtml(
+                    properties.symbol.icon,
+                    properties.symbol.color,
+                  ),
+              iconAnchor: isCluster ? [24, 13] : [11, 11],
+              iconSize: isCluster ? [48, 26] : [22, 22],
             }),
           });
         },
@@ -205,9 +218,13 @@ export function MultiAppMap({
         }),
         onEachFeature: (feature, featureLayer) => {
           const tooltip = document.createElement("span");
-          tooltip.textContent = `${feature.properties.symbol.label ?? "Registro"}: ${feature.properties.recordUuid ?? feature.properties.count.toLocaleString("es-BO")}`;
+          const isCluster =
+            feature.properties.isCluster || feature.properties.count > 1;
+          tooltip.textContent = isCluster
+            ? `${feature.properties.symbol.label ?? "Registros"}: ${feature.properties.count.toLocaleString("es-BO")} · Clic para acercar`
+            : `${feature.properties.symbol.label ?? "Registro"}: ${feature.properties.recordUuid ?? "Sin identificador"}`;
           featureLayer.bindTooltip(tooltip);
-          if (feature.properties.isCluster)
+          if (isCluster)
             featureLayer.on("click", () => {
               if (feature.geometry.type === "Point") {
                 const [longitude, latitude] = feature.geometry.coordinates;
