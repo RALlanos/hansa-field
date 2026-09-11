@@ -1,61 +1,81 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+
+import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  api,
-  type Catalog,
-  type Collection,
-  type Page,
-  type Row,
-  type Schema,
-} from "./contracts";
+import { api, type Catalog, type Collection, type Schema } from "./contracts";
 import { SchemaEditor } from "./schema-editor";
-import { ImportWizard } from "./import-wizard";
+import { ImportWizard } from "../import/import-wizard";
+import { RecordsWorkspace } from "../records/records-workspace";
+import { UniversalMapWorkspace } from "../universal-map/universal-map";
+import { WorkspaceSegmentation } from "./workspace-tools";
 import "./workspace.css";
 import TemplateBuilder from "../templates/template-builder";
-import {
-  WorkspaceSegmentation,
-  WorkspaceUniversalMap,
-} from "./workspace-tools";
-import { recordScope } from "./record-scope";
-import {
-  cacheKeys,
-  canPrefetch,
-  localDataCache,
-} from "../../lib/local-data-cache";
-import {
-  synchronizeWorkspaceScope,
-  workspaceScopeKey,
-} from "../../lib/incremental-workspace-sync";
-const RecordMap = dynamic(
-  () => import("./record-map").then((m) => m.RecordMap),
-  { ssr: false },
-);
+import { cacheKeys, localDataCache } from "../../lib/local-data-cache";
+
 const emptySchema: Schema = { sections: [] };
-export function OperationalWorkspace() {
+
+const defaultCatalog: Catalog = {
+  templates: [],
+  apps: [],
+  projects: [],
+  collections: [],
+  blocks: [],
+};
+
+export type Section =
+  | "Templates"
+  | "Apps"
+  | "Proyectos"
+  | "Cajones"
+  | "Registros"
+  | "Importar"
+  | "Mapa Universal"
+  | "Segmentación"
+  | "Configurar"
+  | "Configurar proyecto";
+
+export function OperationalWorkspace({
+  initialSection = "Apps",
+}: {
+  initialSection?: Section;
+} = {}) {
+  const router = useRouter();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || "/";
+
+  const sectionFromPath = useMemo((): Section => {
+    if (pathname === "/records") return "Registros";
+    if (pathname === "/map") return "Mapa Universal";
+    if (pathname === "/import") return "Importar";
+    if (pathname === "/segmentation") return "Segmentación";
+    if (pathname === "/projects") return "Proyectos";
+    if (pathname === "/blocks") return "Cajones";
+    if (pathname === "/templates") return "Templates";
+    if (pathname === "/apps") return "Apps";
+    return initialSection;
+  }, [pathname, initialSection]);
+
   const [templateEditor, setTemplateEditor] = useState<string | null>(null);
-  const [catalog, setCatalog] = useState<Catalog | null>(null),
-    [section, setSection] = useState("Apps"),
-    [isCollapsed, setIsCollapsed] = useState(false),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [name, setName] = useState(""),
-    [schema, setSchema] = useState<Schema>(emptySchema),
-    [template, setTemplate] = useState(""),
-    [projectId, setProjectId] = useState(""),
-    [datasetId, setDatasetId] = useState(""),
-    [selectedApps, setSelectedApps] = useState<string[]>([]),
-    [page, setPage] = useState<Page>({ rows: [], total: 0, nextCursor: null }),
-    [bbox, setBbox] = useState(""),
-    [cursor, setCursor] = useState(""),
-    [refresh, setRefresh] = useState(0),
-    [edit, setEdit] = useState<Row | null>(null),
-    [values, setValues] = useState<Record<string, unknown>>({}),
-    [coordinates, setCoordinates] = useState(""),
-    [editor, setEditor] = useState(false),
-    [history, setHistory] = useState<string>(""),
-    [targetProject, setTargetProject] = useState(""),
-    [segmentationContext, setSegmentationContext] = useState("");
+  const [catalog, setCatalog] = useState<Catalog>(defaultCatalog);
+  const [section, setSection] = useState<Section>(sectionFromPath);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState("");
+  const [schema, setSchema] = useState<Schema>(emptySchema);
+  const [template, setTemplate] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [datasetId, setDatasetId] = useState("");
+  const [selectedApps, setSelectedApps] = useState<string[]>([]);
+  const [refresh, setRefresh] = useState(0);
+  const [segmentationContext, setSegmentationContext] = useState("");
+
+  useEffect(() => {
+    setSection(sectionFromPath);
+  }, [sectionFromPath]);
+
   const reload = useCallback(async (force = false) => {
     const key = cacheKeys.catalog();
     if (!force) {
@@ -70,15 +90,17 @@ export function OperationalWorkspace() {
     });
     setCatalog(fresh);
   }, []);
+
   useEffect(() => {
     void reload().catch((e) => setError(String(e)));
   }, [reload]);
+
   useEffect(() => {
     if (!catalog) return;
+    if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const destination = params.get("section");
-    if (!destination) return;
-    const allowed = [
+    const destination = params.get("section") as Section | null;
+    const allowed: Section[] = [
       "Templates",
       "Apps",
       "Proyectos",
@@ -90,21 +112,46 @@ export function OperationalWorkspace() {
       "Configurar",
       "Configurar proyecto",
     ];
-    if (allowed.includes(destination)) setSection(destination);
-    const app = catalog.apps.find((item) => item.id === params.get("appId"));
-    if (app) {
-      setDatasetId(app.dataset_id);
-      const definition = catalog.collections.find(
-        (item) => item.id === app.dataset_id,
-      );
-      if (definition) setSchema(definition.schema_definition);
+    if (destination && allowed.includes(destination)) {
+      setSection(destination);
     }
-    const project = catalog.projects.find(
-      (item) => item.id === params.get("projectId"),
-    );
-    if (project) setProjectId(project.id);
-    window.history.replaceState(null, "", "/");
+    const targetAppId = params.get("appId") || params.get("datasetId");
+    if (targetAppId) {
+      const app = catalog.apps.find(
+        (item) => item.id === targetAppId || item.dataset_id === targetAppId,
+      );
+      if (app) {
+        setDatasetId(app.dataset_id);
+        const definition = catalog.collections.find(
+          (item) => item.id === app.dataset_id,
+        );
+        if (definition) setSchema(definition.schema_definition);
+      } else {
+        setDatasetId(targetAppId);
+      }
+    }
+    const targetProjectId = params.get("projectId");
+    if (targetProjectId) {
+      const project = catalog.projects.find(
+        (item) => item.id === targetProjectId,
+      );
+      if (project) setProjectId(project.id);
+      else setProjectId(targetProjectId);
+    }
   }, [catalog]);
+
+  useEffect(() => {
+    if (
+      catalog?.apps.length &&
+      !datasetId &&
+      !projectId &&
+      section === "Registros"
+    ) {
+      const defaultApp = catalog.apps[0]?.dataset_id ?? "";
+      if (defaultApp) setDatasetId(defaultApp);
+    }
+  }, [catalog, datasetId, projectId, section]);
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -119,11 +166,12 @@ export function OperationalWorkspace() {
       await reload(true);
       setRefresh((v) => v + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(e instanceof Error ? e.message : "Error durante la operación.");
     } finally {
       setBusy(false);
     }
   };
+
   const collections =
     catalog?.collections.filter((c) =>
       projectId
@@ -136,228 +184,23 @@ export function OperationalWorkspace() {
   const collection: Collection | undefined = uniqueCollections.find(
     (c) => c.id === datasetId,
   );
-  const fields =
-    collection?.schema_definition.sections.flatMap((s) => s.fields) ?? [];
-  const changeBounds = useCallback((value: string) => {
-    setBbox(value);
-    setCursor("");
-  }, []);
-  useEffect(() => {
-    if (
-      section !== "Registros" ||
-      !catalog ||
-      !bbox ||
-      (!datasetId && !projectId)
-    )
-      return;
-    let cancelled = false;
-    const query = new URLSearchParams();
-    const scope = recordScope(catalog, projectId, datasetId);
-    query.set("mode", scope.mode);
-    if (scope.appIds?.length) query.set("appIds", scope.appIds.join(","));
-    if (scope.projectIds?.length)
-      query.set("projectIds", scope.projectIds.join(","));
-    if (scope.localCollectionIds?.length)
-      query.set("localCollectionIds", scope.localCollectionIds.join(","));
-    if (bbox) query.set("bbox", bbox);
-    if (cursor) query.set("cursor", cursor);
-    const path = `/records?${query}`;
-    const pageScope = workspaceScopeKey(scope);
-    const cacheKey = cacheKeys.table({ path });
-    type PageResponse = {
-      data: {
-        recordUuid: string;
-        projectRecordUuid: string | null;
-        projectAppId: string | null;
-        datasetId: string;
-        revision: number;
-        attributes: Record<string, unknown>;
-        geometry: GeoJSON.Geometry;
-      }[];
-      totalRecords: number;
-      nextCursor: string | null;
-    };
-    const applyPage = (data: PageResponse) => {
-      if (cancelled) return;
-      setPage({
-        total: data.totalRecords,
-        nextCursor: data.nextCursor,
-        rows: data.data.map((item) => ({
-          record_id: item.recordUuid,
-          project_record_id: item.projectRecordUuid,
-          project_app_id: item.projectAppId,
-          dataset_id: item.datasetId,
-          revision: item.revision,
-          attributes: item.attributes,
-          geometry: item.geometry,
-          display_geometry: item.geometry,
-        })),
-      });
-    };
-    void (async () => {
-      try {
-        let cached = await localDataCache.read<PageResponse>(cacheKey);
-        if (cached) applyPage(cached.value);
-        if (cached) {
-          const sync = await synchronizeWorkspaceScope(scope);
-          if (sync.invalidated) cached = null;
-          if (cached && !cached.stale && !sync.initialized && !sync.invalidated)
-            return;
-        }
-        const data = await api<PageResponse>(path);
-        await localDataCache.write(cacheKey, data, {
-          category: "table",
-          scope: pageScope,
-          maxAgeMs: 90_000,
-        });
-        await synchronizeWorkspaceScope(scope);
-        applyPage(data);
-        if (data.nextCursor && canPrefetch()) {
-          const nextQuery = new URLSearchParams(query);
-          nextQuery.set("cursor", data.nextCursor);
-          const nextPath = `/records?${nextQuery}`;
-          const nextKey = cacheKeys.table({ path: nextPath });
-          const nextCached = await localDataCache.read<PageResponse>(nextKey);
-          if (!nextCached) {
-            void api<PageResponse>(nextPath).then((nextPage) =>
-              localDataCache.write(nextKey, nextPage, {
-                category: "table",
-                scope: pageScope,
-                maxAgeMs: 90_000,
-              }),
-            );
-          }
-        }
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [section, datasetId, projectId, bbox, cursor, refresh, catalog]);
-  useEffect(() => {
-    if (!editor) return;
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setEditor(false);
-    };
-    window.addEventListener("keydown", escape);
-    return () => window.removeEventListener("keydown", escape);
-  }, [editor]);
+
   const openRecords = (id: string, project = "") => {
-    setDatasetId(id);
+    const targetDataset =
+      id || (project ? "" : (catalog.apps[0]?.dataset_id ?? ""));
+    setDatasetId(targetDataset);
     setProjectId(project);
-    setCursor("");
     setSection("Registros");
+    const query = new URLSearchParams();
+    if (project) query.set("projectId", project);
+    if (targetDataset) query.set("datasetId", targetDataset);
+    const qStr = query.toString();
+    try {
+      router.push(qStr ? `/records?${qStr}` : `/records`);
+    } catch {}
   };
-  const openEditor = (row: Row | null) => {
-    if (row) {
-      setBusy(true);
-      const path = projectId
-        ? `/projects/${projectId}/records/${row.project_record_id}`
-        : `/records/${row.record_id}`;
-      const cacheKey = cacheKeys.recordDetail({
-        path,
-        recordId: row.record_id,
-        projectRecordId: row.project_record_id,
-        revision: row.revision,
-      });
-      const applyDetail = (detail: {
-        attributes: Record<string, unknown>;
-        geometry: GeoJSON.Geometry | null;
-        revision: number;
-      }) => {
-        setEdit({
-          ...row,
-          attributes: detail.attributes,
-          geometry: detail.geometry,
-          revision: detail.revision,
-        });
-        setValues(detail.attributes);
-        setCoordinates(detail.geometry ? JSON.stringify(detail.geometry) : "");
-        setEditor(true);
-        setHistory("");
-      };
-      void (async () => {
-        try {
-          const cached = await localDataCache.read<{
-            attributes: Record<string, unknown>;
-            geometry: GeoJSON.Geometry | null;
-            revision: number;
-          }>(cacheKey);
-          if (cached) applyDetail(cached.value);
-          if (!cached || cached.stale) {
-            const detail = await api<{
-              attributes: Record<string, unknown>;
-              geometry: GeoJSON.Geometry | null;
-              revision: number;
-            }>(path);
-            await localDataCache.write(cacheKey, detail, {
-              category: "record-detail",
-              scope: row.project_record_id
-                ? `project-record:${row.project_record_id}`
-                : `record:${row.record_id}`,
-              maxAgeMs: 5 * 60 * 1000,
-              revision: detail.revision,
-            });
-            applyDetail(detail);
-          }
-        } catch (reason) {
-          setError(String(reason));
-        } finally {
-          setBusy(false);
-        }
-      })();
-      return;
-    }
-    setEdit(row);
-    setValues({});
-    setCoordinates("");
-    setEditor(true);
-    setHistory("");
-  };
-  const contextSelectors = (
-    <>
-      <label>
-        Contexto
-        <select
-          value={projectId}
-          onChange={(e) => {
-            setProjectId(e.target.value);
-            setDatasetId("");
-            setCursor("");
-          }}
-        >
-          <option value="">App independiente</option>
-          {(catalog?.projects ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        App / colección
-        <select
-          value={datasetId}
-          onChange={(e) => {
-            setDatasetId(e.target.value);
-            setCursor("");
-          }}
-        >
-          <option value="">
-            {projectId ? "Todas las colecciones" : "Seleccionar App"}
-          </option>
-          {uniqueCollections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
-    </>
-  );
-  if (templateEditor)
+
+  if (templateEditor) {
     return (
       <TemplateBuilder
         key={templateEditor}
@@ -368,293 +211,530 @@ export function OperationalWorkspace() {
         }}
       />
     );
+  }
+
   return (
     <div className={`op-shell${isCollapsed ? " collapsed" : ""}`}>
-      <aside>
+      {/* Sidebar */}
+      <aside className="op-sidebar">
         <div className="op-sidebar-header">
           <button
+            type="button"
             className="op-sidebar-toggle"
             onClick={() => setIsCollapsed((v) => !v)}
             aria-label={isCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+            title={isCollapsed ? "Expandir" : "Colapsar"}
           >
             {isCollapsed ? "☰" : "✕"}
           </button>
-          <span>Hansa Field</span>
+          {!isCollapsed && (
+            <div className="op-sidebar-brand truncate">
+              <span className="font-bold text-white tracking-wide">
+                Hansa Field
+              </span>
+              <p className="op-sidebar-subtitle">Entorno Operativo GIS</p>
+            </div>
+          )}
         </div>
-        <p className="op-sidebar-subtitle">Entorno de desarrollo</p>
-        <nav>
-          {[
-            "Templates",
-            "Apps",
-            "Proyectos",
-            "Cajones",
-            "Registros",
-            "Mapa Universal",
-            "Segmentación",
-            "Importar",
-          ].map((label) => (
-            <div
-              key={label}
-              className={`op-sidebar-menu${section === label ? " op-sidebar-menu-active" : ""}`}
-            >
-              <button
-                onClick={() => {
-                  setSection(label);
-                  setName("");
-                  setError("");
-                }}
-                aria-label={label}
-                data-short={label.slice(0, 1)}
+
+        <nav className="op-sidebar-nav">
+          {/* Navigation Group 1: Datos y Territorio */}
+          <div className="op-nav-group">
+            {!isCollapsed && <p className="op-nav-label">DATOS Y TERRITORIO</p>}
+            {[
+              { label: "Registros", icon: "📋", href: "/records" },
+              { label: "Mapa Universal", icon: "🗺️", href: "/map" },
+              { label: "Importar", icon: "📥", href: "/import" },
+              { label: "Segmentación", icon: "🌳", href: "/segmentation" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className={`op-sidebar-menu${section === item.label ? " op-sidebar-menu-active" : ""}`}
               >
-                <span>{label}</span>
-              </button>
-            </div>
-          ))}
+                <Link
+                  href={item.href}
+                  aria-label={item.label}
+                  title={item.label}
+                  onClick={() => {
+                    if (
+                      item.label === "Registros" &&
+                      !datasetId &&
+                      !projectId
+                    ) {
+                      const defaultApp = catalog.apps[0]?.dataset_id ?? "";
+                      if (defaultApp) setDatasetId(defaultApp);
+                    }
+                    setSection(item.label as Section);
+                    setError("");
+                  }}
+                >
+                  <span className="op-menu-icon">{item.icon}</span>
+                  {!isCollapsed && (
+                    <span className="op-menu-text">{item.label}</span>
+                  )}
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          {/* Navigation Group 2: Configuración y Modelado */}
+          <div className="op-nav-group">
+            {!isCollapsed && <p className="op-nav-label">ESTRUCTURAS Y APPS</p>}
+            {[
+              { label: "Apps", icon: "📱", href: "/apps" },
+              { label: "Proyectos", icon: "📁", href: "/projects" },
+              { label: "Cajones", icon: "📦", href: "/blocks" },
+              { label: "Templates", icon: "📐", href: "/templates" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className={`op-sidebar-menu${section === item.label ? " op-sidebar-menu-active" : ""}`}
+              >
+                <Link
+                  href={item.href}
+                  aria-label={item.label}
+                  title={item.label}
+                  onClick={() => {
+                    setSection(item.label as Section);
+                    setError("");
+                  }}
+                >
+                  <span className="op-menu-icon">{item.icon}</span>
+                  {!isCollapsed && (
+                    <span className="op-menu-text">{item.label}</span>
+                  )}
+                </Link>
+              </div>
+            ))}
+          </div>
         </nav>
-      </aside>
-      <main>
-        {section === "Registros" ? (
-          <header className="op-records-bar">
-            <h1>Registros</h1>
-            {contextSelectors}
-            <span className="op-records-count">
-              {page.total} registros
-            </span>
-            <button
-              disabled={!collection}
-              onClick={() => openEditor(null)}
-            >
-              Nuevo registro
-            </button>
-            <button onClick={() => setSection("Importar")}>
-              Importar
-            </button>
-            <button
-              onClick={() => {
-                setBbox("-180,-90,180,90");
-                setCursor("");
-              }}
-            >
-              Tabla
-            </button>
-          </header>
-        ) : section === "Importar" ? (
-          <header className="op-import-bar">
-            <div className="op-import-bar-title">
-              <small>OPERACIONES GIS</small>
-              <h1>Importar</h1>
+
+        {!isCollapsed && (
+          <div className="op-sidebar-footer">
+            <div className="op-footer-status">
+              <span className="op-status-dot" />
+              <span>PostGIS · Conectado</span>
             </div>
-            {contextSelectors}
-          </header>
-        ) : (
-          <header>
-            <small>OPERACIONES GIS</small>
-            <h1>{section}</h1>
-          </header>
+            <p className="op-footer-info">Hansa Ltda. · Redes & Telecom</p>
+          </div>
         )}
-        {error && (
-          <p role="alert" className="op-error">
-            {error}
-          </p>
+      </aside>
+
+      {/* Main Workspace Area */}
+      <main className="op-main-container">
+        {/* Full Records Workspace */}
+        {section === "Registros" && (
+          <RecordsWorkspace
+            catalog={catalog}
+            initialProjectId={projectId}
+            initialDatasetId={datasetId}
+            onNavigateToImport={(pId, dId) => {
+              setProjectId(pId);
+              setDatasetId(dId);
+              setSection("Importar");
+              try {
+                router.push(pId ? `/import?projectId=${pId}` : `/import`);
+              } catch {}
+            }}
+          />
         )}
-        {!catalog ? (
-          <p role="status">Cargando…</p>
-        ) : (
-          <>
-            {section === "Segmentación" && (
-              <WorkspaceSegmentation
-                catalog={catalog}
-                context={segmentationContext}
-                onContextChange={setSegmentationContext}
-              />
-            )}
-            {section === "Mapa Universal" && (
-              <WorkspaceUniversalMap catalog={catalog} />
-            )}
-            {section === "Templates" && (
-              <>
-                <button onClick={() => setTemplateEditor("new")}>
-                  Crear plantilla
-                </button>
-                <h2>Templates existentes</h2>
-                {catalog.templates.map((t) => (
-                  <div className="op-row" key={t.id}>
-                    <strong>{t.name}</strong>
-                    <span>Molde reutilizable · sin registros</span>
-                    <button onClick={() => setTemplateEditor(t.id)}>
-                      Configurar plantilla
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-            {section === "Apps" && (
-              <>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void run(async () => {
-                      await api("/apps", {
-                        name,
-                        ...(template ? { templateVersionId: template } : {}),
-                      });
-                      setName("");
-                    });
+
+        {/* Universal Map Workspace */}
+        {section === "Mapa Universal" && (
+          <UniversalMapWorkspace catalog={catalog} />
+        )}
+
+        {/* Import Wizard */}
+        {section === "Importar" && (
+          <div className="flex-1 flex flex-col h-screen overflow-hidden">
+            <header className="h-13 bg-slate-900 text-white px-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                <h1 className="text-sm font-semibold tracking-wide text-white">
+                  Importar Datos GIS
+                </h1>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400">Contexto:</span>
+                <select
+                  value={projectId}
+                  onChange={(e) => {
+                    setProjectId(e.target.value);
+                    setDatasetId("");
                   }}
+                  className="bg-slate-800 text-white text-xs px-2.5 py-1 rounded border border-slate-700"
                 >
-                  <h2>Nueva App</h2>
-                  <label>
-                    Nombre
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Template opcional
-                    <select
-                      value={template}
-                      onChange={(e) => setTemplate(e.target.value)}
-                    >
-                      <option value="">Sin Template</option>
-                      {catalog.templates.map((t) => (
-                        <option key={t.id} value={t.version_id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button disabled={busy}>Crear App</button>
-                </form>
-                <h2>Apps operativas</h2>
-                {catalog.apps.map((app) => (
-                  <div className="op-row" key={app.id}>
-                    <strong>{app.name}</strong>
-                    <div>
-                      <button
-                        onClick={() => {
-                          setSegmentationContext(`app:${app.id}`);
-                          setSection("Segmentación");
-                        }}
-                      >
-                        Configurar segmentación
-                      </button>
-                      <button
-                        onClick={() => {
-                          openRecords(app.dataset_id);
-                        }}
-                      >
-                        Ver registros
-                      </button>
-                      <button
-                        onClick={() => {
-                          setProjectId("");
-                          setDatasetId(app.dataset_id);
-                          setSchema(
-                            catalog.collections.find(
-                              (c) => c.id === app.dataset_id,
-                            )!.schema_definition,
-                          );
-                          setSection("Configurar");
-                        }}
-                      >
-                        Configurar formulario
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </>
+                  <option value="">App independiente</option>
+                  {catalog.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </header>
+            <ImportWizard
+              key={`${projectId}:${datasetId}`}
+              collections={
+                datasetId
+                  ? uniqueCollections.filter((c) => c.id === datasetId)
+                  : uniqueCollections
+              }
+              projectId={projectId}
+              onComplete={() => {
+                setRefresh((v) => v + 1);
+                setSection("Registros");
+                try {
+                  router.push("/records");
+                } catch {}
+              }}
+              onViewRecords={() => {
+                setSection("Registros");
+                try {
+                  router.push("/records");
+                } catch {}
+              }}
+            />
+          </div>
+        )}
+
+        {/* Segmentation */}
+        {section === "Segmentación" && (
+          <div className="flex-1 flex flex-col h-screen overflow-y-auto p-6 bg-slate-100">
+            <WorkspaceSegmentation
+              catalog={catalog}
+              context={segmentationContext}
+              onContextChange={setSegmentationContext}
+            />
+          </div>
+        )}
+
+        {/* Apps Management */}
+        {section === "Apps" && (
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
+            <header className="border-b border-slate-200 pb-3">
+              <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                ADMINISTRACIÓN
+              </small>
+              <h1 className="text-xl font-bold text-slate-900 mt-0.5">Apps</h1>
+              <p className="text-xs text-slate-500 mt-1">
+                Una App define la recolección de campo, su esquema de formulario
+                y su dataset base de registros.
+              </p>
+            </header>
+
+            {error && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-800">
+                {error}
+              </div>
             )}
-            {section === "Configurar" && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(async () => {
-                    if (!collection) return;
-                    await api(`/datasets/${collection.id}/schema`, {
-                      expectedVersion: collection.version,
-                      schema,
-                    });
-                    setSection("Apps");
+
+            {/* Create App Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await api("/apps", {
+                    name,
+                    ...(template ? { templateVersionId: template } : {}),
                   });
-                }}
-              >
-                <h2>{collection?.name}</h2>
-                <SchemaEditor value={schema} onChange={setSchema} />
-                <button disabled={busy}>Publicar nueva versión</button>
-              </form>
-            )}
-            {section === "Proyectos" && (
-              <>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void run(async () => {
-                      await api("/projects", { name });
-                      setName("");
-                    });
-                  }}
+                  setName("");
+                });
+              }}
+              className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4"
+            >
+              <h2 className="text-sm font-semibold text-slate-800">
+                Crear Nueva App
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="block text-xs font-medium text-slate-700 space-y-1">
+                  <span>Nombre de la App</span>
+                  <input
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej.: Inspección de Postes Eléctricos"
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-sky-500"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-slate-700 space-y-1">
+                  <span>Plantilla opcional (Template)</span>
+                  <select
+                    value={template}
+                    onChange={(e) => setTemplate(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white"
+                  >
+                    <option value="">Sin plantilla (Formulario vacío)</option>
+                    {catalog?.templates.map((t) => (
+                      <option key={t.id} value={t.version_id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  disabled={busy || !name.trim()}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
                 >
-                  <h2>Nuevo proyecto</h2>
-                  <label>
-                    Nombre
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </label>
-                  <button disabled={busy}>Crear proyecto vacío</button>
-                </form>
-                <h2>Proyectos existentes</h2>
-                {catalog.projects.map((project) => (
-                  <div className="op-row" key={project.id}>
-                    <strong>{project.name}</strong>
-                    <button
-                      onClick={() => {
-                        setSegmentationContext(`project:${project.id}`);
-                        setSection("Segmentación");
-                      }}
-                    >
-                      Configurar segmentación
-                    </button>
-                    <button
-                      onClick={() => {
-                        setProjectId(project.id);
-                        setDatasetId("");
-                        setSection("Configurar proyecto");
-                      }}
-                    >
-                      Abrir Proyecto
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-            {section === "Configurar proyecto" && (
-              <>
-                <h2>
-                  {catalog.projects.find((p) => p.id === projectId)?.name}
-                </h2>
-                <button onClick={() => openRecords("", projectId)}>
-                  Ver mapa y tabla del Proyecto
+                  {busy ? "Creando…" : "Crear App"}
                 </button>
-                <h3>Apps y colecciones locales</h3>
+              </div>
+            </form>
+
+            {/* Apps List */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Apps Operativas
+              </h2>
+              {catalog?.apps.length ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {catalog.apps.map((app) => (
+                    <div
+                      key={app.id}
+                      className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-slate-300 transition"
+                    >
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          {app.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Dataset ID:{" "}
+                          <span className="font-mono text-[11px]">
+                            {app.dataset_id}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setSegmentationContext(`app:${app.id}`);
+                            setSection("Segmentación");
+                            try {
+                              router.push(
+                                `/segmentation?context=app:${app.id}`,
+                              );
+                            } catch {}
+                          }}
+                          className="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded transition font-medium"
+                        >
+                          Segmentación
+                        </button>
+                        <button
+                          onClick={() => {
+                            setProjectId("");
+                            setDatasetId(app.dataset_id);
+                            const def = catalog.collections.find(
+                              (c) => c.id === app.dataset_id,
+                            );
+                            if (def) setSchema(def.schema_definition);
+                            setSection("Configurar");
+                          }}
+                          className="px-2.5 py-1 text-xs text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition font-medium"
+                        >
+                          Configurar Formulario
+                        </button>
+                        <button
+                          onClick={() => openRecords(app.dataset_id)}
+                          className="px-3 py-1 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded shadow-xs transition"
+                        >
+                          Ver Registros →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-slate-500 bg-white border border-dashed border-slate-300 rounded-lg">
+                  No hay Apps creadas aún.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Projects Management */}
+        {section === "Proyectos" && (
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
+            <header className="border-b border-slate-200 pb-3">
+              <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                ADMINISTRACIÓN
+              </small>
+              <h1 className="text-xl font-bold text-slate-900 mt-0.5">
+                Proyectos
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                Los proyectos organizan referencias contextuales de múltiples
+                Apps y colecciones locales sin duplicar la fuente maestra.
+              </p>
+            </header>
+
+            {/* Create Project Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await api("/projects", { name });
+                  setName("");
+                });
+              }}
+              className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4"
+            >
+              <h2 className="text-sm font-semibold text-slate-800">
+                Nuevo Proyecto
+              </h2>
+              <label className="block text-xs font-medium text-slate-700 space-y-1">
+                <span>Nombre del Proyecto</span>
+                <input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej.: Mantenimiento Red Norte 2026"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:ring-1 focus:ring-sky-500"
+                />
+              </label>
+              <div className="flex justify-end">
+                <button
+                  disabled={busy || !name.trim()}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
+                >
+                  {busy ? "Creando…" : "Crear Proyecto"}
+                </button>
+              </div>
+            </form>
+
+            {/* Projects List */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Proyectos Existentes
+              </h2>
+              {catalog?.projects.length ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {catalog.projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-slate-300 transition"
+                    >
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          {project.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          ID:{" "}
+                          <span className="font-mono text-[11px]">
+                            {project.id}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setSegmentationContext(`project:${project.id}`);
+                            setSection("Segmentación");
+                            try {
+                              router.push(
+                                `/segmentation?context=project:${project.id}`,
+                              );
+                            } catch {}
+                          }}
+                          className="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded transition font-medium"
+                        >
+                          Segmentación
+                        </button>
+                        <button
+                          onClick={() => {
+                            setProjectId(project.id);
+                            setDatasetId("");
+                            setSection("Configurar proyecto");
+                          }}
+                          className="px-3 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition"
+                        >
+                          Configurar Proyecto
+                        </button>
+                        <button
+                          onClick={() => openRecords("", project.id)}
+                          className="px-3 py-1 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded shadow-xs transition"
+                        >
+                          Ver Registros →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-slate-500 bg-white border border-dashed border-slate-300 rounded-lg">
+                  No hay proyectos configurados aún.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Project Details Configuration */}
+        {section === "Configurar proyecto" && (
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
+            <header className="border-b border-slate-200 pb-3 flex items-center justify-between">
+              <div>
+                <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  CONFIGURACIÓN DE PROYECTO
+                </small>
+                <h1 className="text-xl font-bold text-slate-900 mt-0.5">
+                  {catalog.projects.find((p) => p.id === projectId)?.name ??
+                    "Proyecto"}
+                </h1>
+              </div>
+              <button
+                type="button"
+                onClick={() => openRecords("", projectId)}
+                className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded shadow-xs transition"
+              >
+                Ver mapa y tabla del Proyecto →
+              </button>
+            </header>
+
+            {/* Linked Collections & Apps */}
+            <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Apps y Colecciones Vinculadas
+              </h2>
+              <div className="space-y-2">
                 {uniqueCollections.map((c) => (
-                  <div className="op-row" key={c.id}>
-                    <strong>{c.name}</strong>
-                    <span>
-                      {c.local_project_id
-                        ? "Colección local · sin App"
-                        : "App relacionada"}
-                    </span>
-                    <button onClick={() => openRecords(c.id, projectId)}>
+                  <div
+                    key={c.id}
+                    className="p-3 bg-slate-50 border border-slate-200 rounded flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <strong className="text-slate-900 font-semibold">
+                        {c.name}
+                      </strong>
+                      <span className="text-slate-500 ml-2">
+                        {c.local_project_id
+                          ? "· Colección local propia"
+                          : "· App vinculada"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => openRecords(c.id, projectId)}
+                      className="px-2.5 py-1 text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded font-medium transition"
+                    >
                       Ver registros
                     </button>
                   </div>
                 ))}
-                <h3>Relacionar App existente</h3>
+              </div>
+            </div>
+
+            {/* Relate Existing App */}
+            <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Vincular App Existente al Proyecto
+              </h2>
+              <p className="text-xs text-slate-500">
+                Permite que el proyecto acceda a los registros de la App y
+                registre participaciones contextuales (ProjectRecords).
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
                 {catalog.apps
                   .filter(
                     (a) => !uniqueCollections.some((c) => c.app_id === a.id),
@@ -670,372 +750,349 @@ export function OperationalWorkspace() {
                           });
                         })
                       }
+                      className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition"
                     >
-                      {a.name} +
+                      + {a.name}
                     </button>
                   ))}
-                <h3>Aplicar Cajón</h3>
-                {catalog.blocks.map((b) => (
-                  <div key={b.id}>
-                    <span>
-                      {b.name}:{" "}
-                      {b.app_ids
-                        .map(
-                          (id) => catalog.apps.find((a) => a.id === id)?.name,
-                        )
-                        .join(", ")}
-                    </span>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void run(async () => {
-                          await api(
-                            `/projects/${projectId}/blocks/${b.id}`,
-                            {},
-                          );
-                        })
-                      }
+              </div>
+            </div>
+
+            {/* Apply Block (Cajón) */}
+            {catalog.blocks.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
+                <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                  <span>📦</span> Aplicar Cajón de Apps al Proyecto
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Un Cajón agrupa un paquete predefinido de Apps operativas para
+                  vincularlas juntas a este proyecto.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {catalog.blocks.map((b) => (
+                    <div
+                      key={b.id}
+                      className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-3 text-xs"
                     >
-                      Confirmar aplicación
+                      <div>
+                        <strong className="text-slate-900 font-semibold block">
+                          {b.name}
+                        </strong>
+                        <span className="text-slate-500 text-[11px]">
+                          {b.app_ids.length} Apps en la receta
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await api(`/projects/${projectId}/blocks/${b.id}`);
+                          })
+                        }
+                        className="px-3 py-1.5 text-xs font-semibold text-sky-700 bg-white border border-sky-300 hover:bg-sky-50 rounded shadow-xs transition disabled:opacity-50 shrink-0"
+                      >
+                        Aplicar Cajón
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Create Local Collection */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await api(`/projects/${projectId}/collections`, {
+                    name,
+                    schema,
+                  });
+                  setName("");
+                  setSchema(emptySchema);
+                });
+              }}
+              className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4"
+            >
+              <h2 className="text-sm font-semibold text-slate-800">
+                Crear Colección Local (exclusiva de este Proyecto)
+              </h2>
+              <label className="block text-xs font-medium text-slate-700 space-y-1">
+                <span>Nombre de la colección</span>
+                <input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej.: Trazado de Cables Subterráneos"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded"
+                />
+              </label>
+              <SchemaEditor value={schema} onChange={setSchema} />
+              <div className="flex justify-end">
+                <button
+                  disabled={busy || !name.trim()}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
+                >
+                  {busy ? "Creando…" : "Crear Colección Local"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Cajones (Blocks) Management */}
+        {section === "Cajones" && (
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
+            <header className="border-b border-slate-200 pb-3">
+              <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                ADMINISTRACIÓN
+              </small>
+              <h1 className="text-xl font-bold text-slate-900 mt-0.5">
+                Cajones
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                Un Cajón es una receta que agrupa varias Apps para aplicarlas
+                juntas a cualquier Proyecto.
+              </p>
+            </header>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await api("/blocks", { name, appIds: selectedApps });
+                  setName("");
+                  setSelectedApps([]);
+                });
+              }}
+              className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4"
+            >
+              <h2 className="text-sm font-semibold text-slate-800">
+                Nuevo Cajón
+              </h2>
+              <label className="block text-xs font-medium text-slate-700 space-y-1">
+                <span>Nombre del Cajón</span>
+                <input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej.: Kit de Mantenimiento Eléctrico"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded"
+                />
+              </label>
+              <div className="space-y-2">
+                <span className="text-xs font-medium text-slate-700">
+                  Seleccionar Apps del Cajón:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-slate-200 rounded">
+                  {catalog.apps.map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedApps.includes(a.id)}
+                        onChange={(e) =>
+                          setSelectedApps(
+                            e.target.checked
+                              ? [...selectedApps, a.id]
+                              : selectedApps.filter((id) => id !== a.id),
+                          )
+                        }
+                      />
+                      <span className="truncate">{a.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={busy || !name.trim() || !selectedApps.length}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
+                >
+                  {busy ? "Guardando…" : "Guardar Cajón"}
+                </button>
+              </div>
+            </form>
+
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Cajones Configurados
+              </h2>
+              {catalog.blocks.map((b) => (
+                <div
+                  key={b.id}
+                  className="p-4 bg-white border border-slate-200 rounded-lg shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                >
+                  <div>
+                    <strong className="text-slate-900 font-semibold text-sm block">
+                      {b.name}
+                    </strong>
+                    <span className="text-slate-500">
+                      {b.app_ids.length} Apps asociadas · Receta reutilizable
+                    </span>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {b.app_ids.map((appId) => {
+                        const app = catalog.apps.find((a) => a.id === appId);
+                        return (
+                          <span
+                            key={appId}
+                            className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded text-[11px] font-medium"
+                          >
+                            {app?.name ?? appId.slice(0, 8)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {catalog.projects.length > 0 && (
+                    <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0">
+                      <select
+                        id={`target-proj-${b.id}`}
+                        defaultValue=""
+                        className="text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded text-slate-700 focus:ring-1 focus:ring-sky-500"
+                      >
+                        <option value="" disabled>
+                          Seleccionar Proyecto…
+                        </option>
+                        {catalog.projects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          const sel = document.getElementById(
+                            `target-proj-${b.id}`,
+                          ) as HTMLSelectElement | null;
+                          const pId = sel?.value;
+                          if (!pId) return;
+                          void run(async () => {
+                            await api(`/projects/${pId}/blocks/${b.id}`);
+                          });
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Templates Management */}
+        {section === "Templates" && (
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
+            <header className="border-b border-slate-200 pb-3 flex items-center justify-between">
+              <div>
+                <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  PLANTILLAS
+                </small>
+                <h1 className="text-xl font-bold text-slate-900 mt-0.5">
+                  Templates
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">
+                  Moldes reutilizables de formulario para estandarizar la
+                  creación de Apps.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTemplateEditor("new")}
+                className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded shadow-xs transition"
+              >
+                + Crear Plantilla
+              </button>
+            </header>
+
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Plantillas Existentes
+              </h2>
+              <div className="grid grid-cols-1 gap-3">
+                {catalog.templates.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-4 bg-white border border-slate-200 rounded-lg shadow-xs flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <strong className="text-slate-900 font-semibold text-sm block">
+                        {t.name}
+                      </strong>
+                      <span className="text-slate-500">
+                        Molde reutilizable · Sin registros propios
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setTemplateEditor(t.id)}
+                      className="px-3 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition"
+                    >
+                      Configurar Plantilla
                     </button>
                   </div>
                 ))}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void run(async () => {
-                      await api(`/projects/${projectId}/collections`, {
-                        name,
-                        schema,
-                      });
-                      setName("");
-                      setSchema(emptySchema);
-                    });
-                  }}
-                >
-                  <h3>Nueva colección local (sin App)</h3>
-                  <label>
-                    Nombre
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </label>
-                  <SchemaEditor value={schema} onChange={setSchema} />
-                  <button disabled={busy}>Crear colección local</button>
-                </form>
-              </>
-            )}
-            {section === "Cajones" && (
-              <>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void run(async () => {
-                      await api("/blocks", { name, appIds: selectedApps });
-                      setName("");
-                      setSelectedApps([]);
-                    });
-                  }}
-                >
-                  <h2>Nuevo Cajón</h2>
-                  <label>
-                    Nombre
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </label>
-                  <div className="op-select-list">
-                    {catalog.apps.map((a) => (
-                      <label key={a.id}>
-                        <input
-                          type="checkbox"
-                          checked={selectedApps.includes(a.id)}
-                          onChange={(e) =>
-                            setSelectedApps(
-                              e.target.checked
-                                ? [...selectedApps, a.id]
-                                : selectedApps.filter((id) => id !== a.id),
-                            )
-                          }
-                        />
-                        {a.name}
-                      </label>
-                    ))}
-                  </div>
-                  <button disabled={busy || !selectedApps.length}>
-                    Guardar receta
-                  </button>
-                </form>
-                {catalog.blocks.map((b) => (
-                  <div className="op-row" key={b.id}>
-                    <strong>{b.name}</strong>
-                    <span>{b.app_ids.length} Apps · no contiene registros</span>
-                  </div>
-                ))}
-              </>
-            )}
-            {section === "Importar" && (
-              <ImportWizard
-                key={`${projectId}:${datasetId}`}
-                collections={
-                  datasetId
-                    ? uniqueCollections.filter((c) => c.id === datasetId)
-                    : uniqueCollections
-                }
-                projectId={projectId}
-                onComplete={() => setRefresh((v) => v + 1)}
-              />
-            )}
-            {section === "Registros" && (
-              <>
-                <RecordMap
-                  catalog={catalog}
-                  projectId={projectId}
-                  datasetId={datasetId}
-                  refresh={refresh}
-                  onBounds={changeBounds}
-                  onSelect={(row) => {
-                    setDatasetId(row.dataset_id);
-                    openEditor(row);
-                  }}
-                />
-                <p>La tabla está paginada: máximo 100 filas por página.</p>
-                <div className="op-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Registro</th>
-                        {fields.map((f) => (
-                          <th key={f.id}>{f.label}</th>
-                        ))}
-                        {!fields.length && <th>Atributos</th>}
-                        <th>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {page.rows.map((row) => (
-                        <tr key={row.project_record_id ?? row.record_id}>
-                          <td>{row.record_id.slice(0, 8)}</td>
-                          {fields.map((f) => (
-                            <td key={f.id}>
-                              {String(row.attributes[f.id] ?? "")}
-                            </td>
-                          ))}
-                          {!fields.length && (
-                            <td>
-                              {Object.values(row.attributes)
-                                .map(String)
-                                .join(" · ")}
-                            </td>
-                          )}
-                          <td>
-                            <button
-                              onClick={() => {
-                                setDatasetId(row.dataset_id);
-                                openEditor(row);
-                              }}
-                            >
-                              {projectId ? "Editar" : "Ver detalle"}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!page.rows.length && <p>No hay registros en esta área.</p>}
-                </div>
-                <button disabled={!cursor} onClick={() => setCursor("")}>
-                  Primera página
-                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Configure Form Schema */}
+        {section === "Configurar" && collection && (
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
+            <header className="border-b border-slate-200 pb-3 flex items-center justify-between">
+              <div>
+                <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  DISEÑADOR DE FORMULARIO
+                </small>
+                <h1 className="text-xl font-bold text-slate-900 mt-0.5">
+                  {collection.name}
+                </h1>
+              </div>
+              <button
+                onClick={() => setSection("Apps")}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 bg-white border border-slate-300 rounded"
+              >
+                ← Volver a Apps
+              </button>
+            </header>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await api(`/datasets/${collection.id}/schema`, {
+                    expectedVersion: collection.version,
+                    schema,
+                  });
+                  setSection("Apps");
+                });
+              }}
+              className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4"
+            >
+              <SchemaEditor value={schema} onChange={setSchema} />
+              <div className="flex justify-end pt-4 border-t border-slate-100">
                 <button
-                  disabled={!page.nextCursor}
-                  onClick={() => setCursor(page.nextCursor ?? "")}
+                  disabled={busy}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
                 >
-                  Siguiente
+                  {busy
+                    ? "Guardando…"
+                    : "Publicar Nueva Versión del Formulario"}
                 </button>
-              </>
-            )}
-          </>
+              </div>
+            </form>
+          </div>
         )}
       </main>
-      {editor && (
-        <div
-          className="op-backdrop"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setEditor(false);
-          }}
-          role="presentation"
-        >
-          <section
-            className="op-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Registro"
-          >
-            <button
-              className="op-close"
-              aria-label="Cerrar"
-              onClick={() => setEditor(false)}
-            >
-              ×
-            </button>
-            <h2>{edit ? "Registro" : "Nuevo registro"}</h2>
-            {fields.map((field) => (
-              <label key={field.id}>
-                {field.label}
-                <input
-                  disabled={!!edit && !projectId}
-                  type={
-                    field.type === "number"
-                      ? "number"
-                      : field.type === "date"
-                        ? "date"
-                        : "text"
-                  }
-                  value={String(values[field.id] ?? "")}
-                  onChange={(e) =>
-                    setValues({
-                      ...values,
-                      [field.id]:
-                        field.type === "number"
-                          ? e.target.value === ""
-                            ? null
-                            : Number(e.target.value)
-                          : field.type === "boolean"
-                            ? e.target.value === "true"
-                            : e.target.value,
-                    })
-                  }
-                />
-              </label>
-            ))}
-            <label>
-              Geometría GeoJSON (EPSG:4326)
-              <textarea
-                disabled={!!edit && !projectId}
-                placeholder={'{"type":"Point","coordinates":[-63.18,-17.78]}'}
-                value={coordinates}
-                onChange={(e) => setCoordinates(e.target.value)}
-              />
-            </label>
-            {(!edit || projectId) && (
-              <button
-                disabled={busy || !collection}
-                onClick={() =>
-                  void run(async () => {
-                    const geometry = coordinates.trim()
-                      ? JSON.parse(coordinates)
-                      : null;
-                    if (edit) {
-                      await api(
-                        `/projects/${projectId}/records/${edit.project_record_id}`,
-                        {
-                          expectedRevision: edit.revision,
-                          attributesOverride: values,
-                          geometryOverride: geometry,
-                        },
-                        "PATCH",
-                      );
-                    } else {
-                      await api("/records", {
-                        datasetId,
-                        ...(projectId ? { projectId } : {}),
-                        ...(projectId && collection?.project_app_id
-                          ? { projectAppId: collection.project_app_id }
-                          : {}),
-                        attributes: values,
-                        geometry,
-                      });
-                    }
-                    setEditor(false);
-                  })
-                }
-              >
-                Guardar
-              </button>
-            )}
-            {edit && (
-              <>
-                <button
-                  onClick={() =>
-                    void run(async () => {
-                      setHistory(
-                        JSON.stringify(
-                          await api(`/records/${edit.record_id}`),
-                          null,
-                          2,
-                        ),
-                      );
-                    })
-                  }
-                >
-                  Procedencia e historial
-                </button>
-                {projectId && (
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async () => {
-                        await api(
-                          `/projects/${projectId}/records/${edit.project_record_id}`,
-                          { expectedRevision: edit.revision },
-                          "DELETE",
-                        );
-                        setEditor(false);
-                      })
-                    }
-                  >
-                    Retirar del Proyecto
-                  </button>
-                )}
-                <label>
-                  Incorporar a otro Proyecto
-                  <select
-                    value={targetProject}
-                    onChange={(e) => setTargetProject(e.target.value)}
-                  >
-                    <option value="">Seleccionar destino</option>
-                    {catalog?.projects
-                      .filter((p) => p.id !== projectId)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <button
-                  disabled={busy || !targetProject}
-                  onClick={() =>
-                    void run(async () => {
-                      const target = catalog?.collections.find(
-                        (c) =>
-                          c.id === datasetId && c.project_id === targetProject,
-                      );
-                      if (!target?.project_app_id)
-                        throw new Error(
-                          "Relaciona primero esta App al Proyecto destino.",
-                        );
-                      await api(`/projects/${targetProject}/incorporate`, {
-                        recordId: edit.record_id,
-                        projectAppId: target.project_app_id,
-                      });
-                      setEditor(false);
-                    })
-                  }
-                >
-                  Confirmar incorporación
-                </button>
-              </>
-            )}
-            {history && <pre>{history}</pre>}
-          </section>
-        </div>
-      )}
     </div>
   );
 }

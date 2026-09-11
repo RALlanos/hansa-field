@@ -76,16 +76,24 @@ function openDatabase(): Promise<IDBDatabase | null> {
   if (typeof window === "undefined" || !("indexedDB" in window))
     return Promise.resolve(null);
   databasePromise = new Promise((resolve) => {
-    const request = window.indexedDB.open(DATABASE, 1);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      const store = database.createObjectStore(STORE, { keyPath: "key" });
-      store.createIndex("lastAccessedAt", "lastAccessedAt");
-      store.createIndex("category", "category");
-      store.createIndex("scope", "scope");
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve(null);
+    try {
+      const request = window.indexedDB.open(DATABASE, 1);
+      request.onupgradeneeded = () => {
+        try {
+          const database = request.result;
+          const store = database.createObjectStore(STORE, { keyPath: "key" });
+          store.createIndex("lastAccessedAt", "lastAccessedAt");
+          store.createIndex("category", "category");
+          store.createIndex("scope", "scope");
+        } catch {
+          // ignore index creation errors
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
   });
   return databasePromise;
 }
@@ -94,15 +102,23 @@ async function transaction<T>(
   mode: IDBTransactionMode,
   action: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T | undefined> {
-  const database = await openDatabase();
-  if (!database) return undefined;
-  return new Promise((resolve) => {
-    const tx = database.transaction(STORE, mode);
-    const request = action(tx.objectStore(STORE));
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve(undefined);
-    tx.onabort = () => resolve(undefined);
-  });
+  try {
+    const database = await openDatabase();
+    if (!database) return undefined;
+    return new Promise((resolve) => {
+      try {
+        const tx = database.transaction(STORE, mode);
+        const request = action(tx.objectStore(STORE));
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => resolve(undefined);
+        tx.onabort = () => resolve(undefined);
+      } catch {
+        resolve(undefined);
+      }
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 async function evict(): Promise<void> {
@@ -260,7 +276,11 @@ export async function applyIncrementalChanges(
     changes.flatMap((change) => [
       localDataCache.invalidateScope(`record:${change.recordId}`),
       ...(change.projectRecordId
-        ? [localDataCache.invalidateScope(`project-record:${change.projectRecordId}`)]
+        ? [
+            localDataCache.invalidateScope(
+              `project-record:${change.projectRecordId}`,
+            ),
+          ]
         : []),
     ]),
   );

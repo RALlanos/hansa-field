@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   color-scheme: light;
   --ink: #252a30;
@@ -1710,6 +1712,10 @@ body {
   position: relative;
   overflow: hidden;
   background: #e7ecef;
+}
+.records-workspace-map-panel .multi-app-map-frame,
+.records-workspace-map-panel .multi-app-map {
+  min-height: 0;
 }
 .multi-map-state {
   position: absolute;

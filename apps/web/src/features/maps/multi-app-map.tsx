@@ -105,6 +105,8 @@ export function MultiAppMap({
   useEffect(() => {
     if (!container.current || map.current) return;
     let active = true;
+    let resizeObserver: ResizeObserver | null = null;
+    let resizeFrame: number | null = null;
     void import("leaflet").then((leaflet) => {
       if (!active || !container.current) return;
       const instance = leaflet
@@ -124,11 +126,26 @@ export function MultiAppMap({
         })
         .addTo(instance);
       map.current = instance;
+      // Leaflet measures its container only at initialization. The records
+      // workspace can change this container from a split panel to full width
+      // without firing a browser resize event, so watch the actual element.
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => {
+          if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+          resizeFrame = window.requestAnimationFrame(() => {
+            resizeFrame = null;
+            map.current?.invalidateSize({ pan: false, debounceMoveend: true });
+          });
+        });
+        resizeObserver.observe(container.current);
+      }
       setInitialized(true);
       window.setTimeout(() => instance.invalidateSize(), 0);
     });
     return () => {
       active = false;
+      resizeObserver?.disconnect();
+      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       map.current?.remove();
       map.current = null;
       layer.current = null;

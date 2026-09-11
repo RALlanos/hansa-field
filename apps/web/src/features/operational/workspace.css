@@ -1,124 +1,215 @@
 .op-shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   min-height: 100vh;
-  background: #f5f7f9;
-  color: #17324d;
-  font:
-    14px Arial,
+  height: 100vh;
+  overflow: hidden;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
     sans-serif;
-  transition: grid-template-columns 0.3s ease;
+  font-size: 13px;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .op-shell.collapsed {
-  grid-template-columns: 60px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
 }
 .op-shell .op-sidebar-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #4a6c80;
+  gap: 10px;
+  padding: 14px 14px;
+  border-bottom: 1px solid #1e3347;
+  flex-shrink: 0;
 }
 .op-sidebar-toggle {
-  background: transparent;
-  border: none;
-  color: #aab8c4;
+  background: #192a3a;
+  border: 1px solid #233b50;
+  color: #94a3b8;
   cursor: pointer;
-  padding: 4px;
-  font-size: 18px;
-  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 14px;
+  border-radius: 5px;
+  line-height: 1;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 .op-sidebar-toggle:hover {
-  background: #3b637e;
+  background: #233b50;
   color: #ffffff;
+  border-color: #38bdf8;
+}
+.op-sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .op-sidebar-subtitle {
-  font-size: 12px;
-  color: #6b8294;
+  font-size: 11px;
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  margin: 1px 0 0 0;
 }
-.op-shell aside {
-  background: #284d65;
-  color: white;
-  padding: 14px 10px;
+.op-sidebar {
+  background: #0d1b2a;
+  color: #f8fafc;
+  border-right: 1px solid #1e3347;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0;
   min-width: 0;
   overflow: hidden;
-  transition: width 0.3s ease;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.op-shell.collapsed aside {
-  width: 60px;
-  padding: 8px 6px;
+.op-shell.collapsed .op-sidebar {
+  width: 64px;
 }
-.op-shell aside h1 {
-  font-size: 16px;
-  text-align: center;
-  margin: 4px 0;
-  opacity: 0;
-  transition: opacity 0.3s;
+.op-sidebar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: 0.02em;
 }
-.op-shell.collapsed aside h1 {
-  opacity: 1;
+.op-shell nav.op-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 10px;
+  flex: 1;
+  overflow-y: auto;
 }
-.op-shell nav {
-  display: grid;
+.op-nav-group {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  margin-top: 12px;
+}
+.op-nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  padding: 4px 8px 6px 8px;
+  margin: 0;
+  text-transform: uppercase;
 }
 .op-sidebar-menu {
-  margin: 2px 0;
+  margin: 1px 0;
   border-radius: 6px;
 }
-.op-sidebar-menu button {
-  display: block;
+.op-sidebar-menu button,
+.op-sidebar-menu a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 0;
   border-radius: 6px;
-  color: #dce8f0;
+  color: #cbd5e1;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: left;
+  text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+.op-menu-icon {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.op-menu-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
 }
 .op-sidebar-menu-active {
-  background: rgba(59, 99, 126, 0.3);
-  border-radius: 6px;
+  background: #0284c7;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
-.op-sidebar-menu-active button {
+.op-sidebar-menu-active button,
+.op-sidebar-menu-active a {
   font-weight: 600;
   color: #ffffff;
 }
-.op-sidebar-menu:hover button,
-.op-sidebar-menu button:focus-visible {
-  background: #3b637e;
+.op-sidebar-menu:hover:not(.op-sidebar-menu-active) button,
+.op-sidebar-menu:hover:not(.op-sidebar-menu-active) a {
+  background: #192a3a;
   color: #ffffff;
 }
-.op-shell main {
-  padding: 28px;
-  min-width: 0;
-  transition: margin-left 0.3s;
+.op-sidebar-footer {
+  margin-top: auto;
+  padding: 12px 14px;
+  border-top: 1px solid #1e3347;
+  background: #09131e;
+  flex-shrink: 0;
 }
-.op-shell.collapsed .op-sidebar-header span,
+.op-footer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #38bdf8;
+  font-weight: 600;
+  font-size: 11px;
+}
+.op-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+  flex-shrink: 0;
+}
+.op-footer-info {
+  margin: 3px 0 0 0;
+  color: #64748b;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-shell main {
+  padding: 0;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.op-shell.collapsed .op-sidebar-header .op-sidebar-brand,
 .op-shell.collapsed .op-sidebar-subtitle,
-.op-shell.collapsed .op-sidebar-menu button span {
+.op-shell.collapsed .op-nav-label,
+.op-shell.collapsed .op-menu-text,
+.op-shell.collapsed .op-sidebar-footer {
   display: none;
 }
-.op-shell.collapsed .op-sidebar-menu button {
-  padding-inline: 0;
-  text-align: center;
-  font-size: 0;
+.op-shell.collapsed .op-sidebar-menu button,
+.op-shell.collapsed .op-sidebar-menu a {
+  padding: 9px 0;
+  justify-content: center;
 }
-.op-shell.collapsed .op-sidebar-menu button::before {
-  content: attr(data-short);
-  font-size: 13px;
-  font-weight: 700;
+.op-shell.collapsed .op-menu-icon {
+  font-size: 17px;
 }
 .op-shell h1 {
   font-size: 26px;
@@ -153,16 +244,6 @@
 }
 .op-shell input[type="checkbox"] {
   width: 18px;
-}
-.op-shell button {
-  padding: 9px 14px;
-  margin: 4px;
-  border: 1px solid #b9cad6;
-  border-radius: 4px;
-  background: white;
-  color: #17324d;
-  cursor: pointer;
-  font: inherit;
 }
 .op-shell button:disabled {
   opacity: 0.5;
@@ -639,7 +720,7 @@
   .op-shell {
     grid-template-columns: 1fr;
   }
-  .op-shell aside {
+  .op-sidebar {
     padding: 10px;
   }
   .op-shell nav {
