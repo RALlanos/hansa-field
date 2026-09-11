@@ -74,9 +74,9 @@ export function UniversalMapWorkspace({ catalog }: { catalog: Catalog }) {
       </header>
 
       {/* Main Container */}
-      <div className="flex-1 relative flex">
+      <div className="flex-1 relative flex isolate">
         {/* Scope Selector Floating Drawer / Overlay */}
-        <div className="absolute top-3 left-3 z-10 w-72 bg-white/95 backdrop-blur-xs border border-slate-200 rounded-lg shadow-lg p-3.5 space-y-3 max-h-[85vh] overflow-y-auto text-xs text-slate-700">
+        <div className="absolute top-3 left-3 z-[1000] w-72 bg-white/95 backdrop-blur-xs border border-slate-200 rounded-lg shadow-lg p-3.5 space-y-3 max-h-[85vh] overflow-y-auto text-xs text-slate-700">
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
             <h2 className="font-semibold text-slate-900 uppercase tracking-wider text-[11px]">
               Capas Activas
