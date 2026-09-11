@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Catalog, Collection, Row } from "../operational/contracts";
+import type { Catalog, Collection, Field, Row } from "../operational/contracts";
 import { api } from "../operational/contracts";
 import { recordScope } from "../operational/record-scope";
 import {
@@ -40,6 +40,26 @@ type PageResponse = {
   totalRecords: number;
   nextCursor: string | null;
 };
+
+function fieldValue(attributes: Record<string, unknown>, field: Field): string {
+  const exactKeys = [field.id, field.key];
+  for (const key of exactKeys) {
+    const value = attributes[key];
+    if (value !== undefined && value !== null) return String(value);
+  }
+
+  const normalizedKeys = new Set(exactKeys.map((key) => key.toLowerCase()));
+  for (const [key, value] of Object.entries(attributes)) {
+    if (
+      normalizedKeys.has(key.toLowerCase()) &&
+      value !== undefined &&
+      value !== null
+    ) {
+      return String(value);
+    }
+  }
+  return "—";
+}
 
 export function RecordsWorkspace({
   catalog,
@@ -518,7 +538,7 @@ export function RecordsWorkspace({
                             key={f.id}
                             className="py-2 px-3 truncate max-w-[140px]"
                           >
-                            {String(row.attributes[f.id] ?? "—")}
+                            {fieldValue(row.attributes, f)}
                           </td>
                         ))}
                         {!fields.length && (
