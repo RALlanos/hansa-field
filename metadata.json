@@ -1,0 +1,6 @@
+{
+  "name": "Hansa Field",
+  "description": "Plataforma GIS configurable para operaciones de campo, gestión de registros, importación de shapefiles y mapas.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
