@@ -1,8 +1,14 @@
 import type { Client, PoolClient } from "pg";
 
 import { pilotBaseline } from "./pilot-baseline.js";
-import {segmentationMigration} from "../segmentation/segmentation.migration.js";
-const migrations = [pilotBaseline,segmentationMigration];
+import { segmentationMigration } from "../segmentation/segmentation.migration.js";
+import { localOrganizationMigration } from "./local-organization.migration.js";
+
+const migrations = [
+  pilotBaseline,
+  segmentationMigration,
+  localOrganizationMigration,
+];
 
 type MigrationClient = Client | PoolClient;
 
