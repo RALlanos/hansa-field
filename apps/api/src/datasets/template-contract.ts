@@ -88,3 +88,5 @@ export const templateInput = z
     }),
   })
   .strict();
+
+export type BuilderInput = z.infer<typeof templateInput>;

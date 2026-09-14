@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { api, type Catalog, type Collection, type Schema } from "./contracts";
+import { api, type Catalog, type Schema } from "./contracts";
 import { SchemaEditor } from "./schema-editor";
 import { ImportWizard } from "../import/import-wizard";
 import { RecordsWorkspace } from "../records/records-workspace";
@@ -33,8 +33,12 @@ export type Section =
   | "Importar"
   | "Mapa Universal"
   | "Segmentación"
-  | "Configurar"
   | "Configurar proyecto";
+
+type BuilderTarget =
+  | { kind: "template"; id: string }
+  | { kind: "app"; id: string }
+  | { kind: "projectApp"; id: string };
 
 export function OperationalWorkspace({
   initialSection = "Apps",
@@ -57,7 +61,9 @@ export function OperationalWorkspace({
     return initialSection;
   }, [pathname, initialSection]);
 
-  const [templateEditor, setTemplateEditor] = useState<string | null>(null);
+  const [builderTarget, setBuilderTarget] = useState<BuilderTarget | null>(
+    null,
+  );
   const [catalog, setCatalog] = useState<Catalog>(defaultCatalog);
   const [section, setSection] = useState<Section>(sectionFromPath);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -109,7 +115,6 @@ export function OperationalWorkspace({
       "Importar",
       "Mapa Universal",
       "Segmentación",
-      "Configurar",
       "Configurar proyecto",
     ];
     if (destination && allowed.includes(destination)) {
@@ -181,10 +186,6 @@ export function OperationalWorkspace({
   const uniqueCollections = collections.filter(
     (c, i, list) => list.findIndex((x) => x.id === c.id) === i,
   );
-  const collection: Collection | undefined = uniqueCollections.find(
-    (c) => c.id === datasetId,
-  );
-
   const openRecords = (id: string, project = "") => {
     const targetDataset =
       id || (project ? "" : (catalog.apps[0]?.dataset_id ?? ""));
@@ -200,15 +201,19 @@ export function OperationalWorkspace({
     } catch {}
   };
 
-  if (templateEditor) {
+  if (builderTarget) {
     return (
       <TemplateBuilder
-        key={templateEditor}
-        templateId={templateEditor}
+        key={`${builderTarget.kind}:${builderTarget.id}`}
+        templateId={builderTarget.id}
+        mode={builderTarget.kind}
         onBack={() => {
-          setTemplateEditor(null);
+          setBuilderTarget(null);
           void reload().catch((e) => setError(String(e)));
         }}
+        onOpenTemplate={(templateId) =>
+          setBuilderTarget({ kind: "template", id: templateId })
+        }
       />
     );
   }
@@ -523,17 +528,11 @@ export function OperationalWorkspace({
                         </button>
                         <button
                           onClick={() => {
-                            setProjectId("");
-                            setDatasetId(app.dataset_id);
-                            const def = catalog.collections.find(
-                              (c) => c.id === app.dataset_id,
-                            );
-                            if (def) setSchema(def.schema_definition);
-                            setSection("Configurar");
+                            setBuilderTarget({ kind: "app", id: app.id });
                           }}
                           className="px-2.5 py-1 text-xs text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition font-medium"
                         >
-                          Configurar Formulario
+                          Configurar App
                         </button>
                         <button
                           onClick={() => openRecords(app.dataset_id)}
@@ -720,6 +719,20 @@ export function OperationalWorkspace({
                     >
                       Ver registros
                     </button>
+                    {c.project_app_id && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBuilderTarget({
+                            kind: "projectApp",
+                            id: c.project_app_id!,
+                          })
+                        }
+                        className="ml-2 px-2.5 py-1 text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded font-medium transition"
+                      >
+                        Configurar App
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1007,7 +1020,9 @@ export function OperationalWorkspace({
               </div>
               <button
                 type="button"
-                onClick={() => setTemplateEditor("new")}
+                onClick={() =>
+                  setBuilderTarget({ kind: "template", id: "new" })
+                }
                 className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded shadow-xs transition"
               >
                 + Crear Plantilla
@@ -1033,7 +1048,9 @@ export function OperationalWorkspace({
                       </span>
                     </div>
                     <button
-                      onClick={() => setTemplateEditor(t.id)}
+                      onClick={() =>
+                        setBuilderTarget({ kind: "template", id: t.id })
+                      }
                       className="px-3 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition"
                     >
                       Configurar Plantilla
@@ -1042,54 +1059,6 @@ export function OperationalWorkspace({
                 ))}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Configure Form Schema */}
-        {section === "Configurar" && collection && (
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-5xl mx-auto w-full space-y-6">
-            <header className="border-b border-slate-200 pb-3 flex items-center justify-between">
-              <div>
-                <small className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  DISEÑADOR DE FORMULARIO
-                </small>
-                <h1 className="text-xl font-bold text-slate-900 mt-0.5">
-                  {collection.name}
-                </h1>
-              </div>
-              <button
-                onClick={() => setSection("Apps")}
-                className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 bg-white border border-slate-300 rounded"
-              >
-                ← Volver a Apps
-              </button>
-            </header>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void run(async () => {
-                  await api(`/datasets/${collection.id}/schema`, {
-                    expectedVersion: collection.version,
-                    schema,
-                  });
-                  setSection("Apps");
-                });
-              }}
-              className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4"
-            >
-              <SchemaEditor value={schema} onChange={setSchema} />
-              <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button
-                  disabled={busy}
-                  className="px-5 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 disabled:opacity-50 rounded shadow-xs transition"
-                >
-                  {busy
-                    ? "Guardando…"
-                    : "Publicar Nueva Versión del Formulario"}
-                </button>
-              </div>
-            </form>
           </div>
         )}
       </main>

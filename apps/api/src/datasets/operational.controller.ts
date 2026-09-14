@@ -10,12 +10,14 @@ import {
   Headers,
   Inject,
   BadRequestException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { z } from "zod";
 import { DatabaseService } from "../database/database.service.js";
 import { DatasetsService } from "./datasets.service.js";
 import { DatasetRecordsService } from "./dataset-records.service.js";
 import { datasetSchema } from "./dataset-contracts.js";
+import { templateInput, type BuilderInput } from "./template-contract.js";
 import { geometrySchema } from "../records/record-input.js";
 import { mapScopeSchema } from "./map-scope.js";
 import { MapRecordsService } from "./map-records.service.js";
@@ -58,6 +60,31 @@ export class OperationalController {
       actorId: "local-development",
       operationId: uuid.parse(operationId),
     };
+  }
+
+  private parseBuilderInput(body: unknown): BuilderInput {
+    const input = templateInput.parse(body);
+    const fields = input.schema.sections.flatMap((section) => section.fields);
+    for (const field of fields) {
+      if (
+        field.visibility?.conditions.some(
+          (condition) =>
+            condition.fieldId === field.id ||
+            !fields.some((candidate) => candidate.id === condition.fieldId),
+        )
+      )
+        throw new UnprocessableEntityException(
+          "Una regla referencia un campo inexistente o a sí mismo.",
+        );
+      if (
+        (field.type === "singleChoice" || field.type === "multipleChoice") &&
+        !field.options?.length
+      )
+        throw new UnprocessableEntityException(
+          "Una selección necesita opciones.",
+        );
+    }
+    return input;
   }
   @Get()
   async catalog() {
@@ -105,6 +132,19 @@ export class OperationalController {
       input.templateVersionId,
     );
   }
+  @Get("apps/:appId/builder") appBuilder(@Param("appId") appId: string) {
+    return this.datasets.getAppBuilder(LOCAL_ORGANIZATION, uuid.parse(appId));
+  }
+  @Post("apps/:appId/versions") appVersion(
+    @Param("appId") appId: string,
+    @Body() body: unknown,
+  ) {
+    return this.datasets.publishAppBuilder(
+      LOCAL_ORGANIZATION,
+      uuid.parse(appId),
+      this.parseBuilderInput(body),
+    );
+  }
   @Post("projects") project(@Body() body: unknown) {
     return this.datasets.createProject(
       LOCAL_ORGANIZATION,
@@ -119,6 +159,24 @@ export class OperationalController {
       LOCAL_ORGANIZATION,
       uuid.parse(projectId),
       z.object({ appId: uuid }).strict().parse(body).appId,
+    );
+  }
+  @Get("project-apps/:projectAppId/builder") projectAppBuilder(
+    @Param("projectAppId") projectAppId: string,
+  ) {
+    return this.datasets.getProjectAppBuilder(
+      LOCAL_ORGANIZATION,
+      uuid.parse(projectAppId),
+    );
+  }
+  @Post("project-apps/:projectAppId/versions") projectAppVersion(
+    @Param("projectAppId") projectAppId: string,
+    @Body() body: unknown,
+  ) {
+    return this.datasets.publishProjectAppBuilder(
+      LOCAL_ORGANIZATION,
+      uuid.parse(projectAppId),
+      this.parseBuilderInput(body),
     );
   }
   @Post("projects/:projectId/collections") local(
@@ -318,7 +376,12 @@ export class OperationalController {
         : {}),
     });
     const cursor = typeof rawCursor === "string" ? uuid.parse(rawCursor) : null;
-    const limit = z.coerce.number().int().min(1).max(200).parse(rawLimit ?? 100);
+    const limit = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(200)
+      .parse(rawLimit ?? 100);
     if (input.bbox[0] >= input.bbox[2] || input.bbox[1] >= input.bbox[3])
       throw new BadRequestException("Área inválida.");
     return this.mapRecords.table(LOCAL_ORGANIZATION, input, cursor, limit);
@@ -357,19 +420,17 @@ export class OperationalController {
           Buffer.from(input.cursor, "base64url").toString("utf8"),
         ) as unknown;
         cursor = z
-          .object({ createdAt: z.string().datetime({ offset: true }), eventId: uuid })
+          .object({
+            createdAt: z.string().datetime({ offset: true }),
+            eventId: uuid,
+          })
           .strict()
           .parse(decoded);
       } catch {
         throw new BadRequestException("Cursor de cambios inválido.");
       }
     }
-    return this.changes.list(
-      LOCAL_ORGANIZATION,
-      input,
-      cursor,
-      input.limit,
-    );
+    return this.changes.list(LOCAL_ORGANIZATION, input, cursor, input.limit);
   }
   @Get("map") async map(@Query() raw: unknown) {
     const query =
@@ -380,26 +441,24 @@ export class OperationalController {
       ...query,
       ...(typeof query.bbox === "string"
         ? {
-            bbox:
-              query.bbox.split(",").map(Number),
+            bbox: query.bbox.split(",").map(Number),
           }
         : {}),
       ...(typeof query.appIds === "string"
         ? {
-            appIds:
-              query.appIds.split(",").filter(Boolean),
+            appIds: query.appIds.split(",").filter(Boolean),
           }
         : {}),
       ...(typeof query.projectIds === "string"
         ? {
-            projectIds:
-              query.projectIds.split(",").filter(Boolean),
+            projectIds: query.projectIds.split(",").filter(Boolean),
           }
         : {}),
       ...(typeof query.localCollectionIds === "string"
         ? {
-            localCollectionIds:
-              query.localCollectionIds.split(",").filter(Boolean),
+            localCollectionIds: query.localCollectionIds
+              .split(",")
+              .filter(Boolean),
           }
         : {}),
     });

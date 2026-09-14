@@ -5,6 +5,7 @@ import { pilotBaseline } from "../database/pilot-baseline.js";
 import type { TransactionalDatabase } from "../database/database.service.js";
 import { DatasetsService } from "./datasets.service.js";
 import { DatasetRecordsService } from "./dataset-records.service.js";
+import type { BuilderInput } from "./template-contract.js";
 
 const client = new Client({
   connectionString:
@@ -45,6 +46,26 @@ const schema = {
     },
   ],
 };
+const builderInput = (
+  name: string,
+  expectedVersion: number,
+  nextSchema = schema,
+): BuilderInput => ({
+  name,
+  expectedVersion,
+  schema: {
+    ...nextSchema,
+    settings: {
+      id: "builder",
+      name,
+      code: "POSTES",
+      description: "",
+      allowedGeometries: ["Point"],
+      mapIcon: "pin" as const,
+      mapColor: "#397da7",
+    },
+  },
+});
 const datasets = new DatasetsService(db),
   records = new DatasetRecordsService(db);
 const actor = () => ({
@@ -212,4 +233,71 @@ it("schema label edits preserve values and publication is independent from lifec
       record.recordId,
     ]),
   ).rejects.toThrow();
+});
+it("App and Project App builders publish isolated immutable versions", async () => {
+  const template = await datasets.createTemplate(org, "Base", schema);
+  const app = await datasets.createApp(org, "Postes", template.versionId);
+  const firstProject = await datasets.createProject(org, "A");
+  const secondProject = await datasets.createProject(org, "B");
+  const first = await datasets.relateApp(
+    org,
+    firstProject.projectId,
+    app.appId,
+  );
+  const second = await datasets.relateApp(
+    org,
+    secondProject.projectId,
+    app.appId,
+  );
+
+  await datasets.publishAppBuilder(
+    org,
+    app.appId,
+    builderInput("Postes configurados", 1),
+  );
+  const templateVersions = await client.query(
+    "SELECT version FROM template_versions WHERE template_id=$1",
+    [template.id],
+  );
+  expect(templateVersions.rows).toHaveLength(1);
+  const projectVersionsBefore = await client.query(
+    "SELECT version FROM project_app_versions WHERE project_app_id=ANY($1::uuid[])",
+    [[first.projectAppId, second.projectAppId]],
+  );
+  expect(projectVersionsBefore.rows).toHaveLength(2);
+
+  await datasets.publishProjectAppBuilder(
+    org,
+    second.projectAppId,
+    builderInput("Postes B", 1, {
+      sections: schema.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((item) => ({
+          ...item,
+          label: "Altura local B",
+        })),
+      })),
+    }),
+  );
+  const projectVersionsAfter = await client.query(
+    "SELECT project_app_id,version FROM project_app_versions WHERE project_app_id=ANY($1::uuid[]) ORDER BY project_app_id,version",
+    [[first.projectAppId, second.projectAppId]],
+  );
+  expect(projectVersionsAfter.rows).toHaveLength(3);
+  expect(
+    projectVersionsAfter.rows.filter(
+      (row) => row.project_app_id === first.projectAppId,
+    ),
+  ).toHaveLength(1);
+  const projectSymbol = await client.query<{ settings: unknown }>(
+    "SELECT settings FROM project_app_versions WHERE project_app_id=$1 ORDER BY version DESC LIMIT 1",
+    [second.projectAppId],
+  );
+  expect(projectSymbol.rows[0]?.settings).toMatchObject({
+    symbol: { icon: "pin", color: "#397da7", label: "Postes B" },
+  });
+  expect(await datasets.getAppBuilder(org, app.appId)).toMatchObject({
+    name: "Postes configurados",
+    version: 2,
+  });
 });

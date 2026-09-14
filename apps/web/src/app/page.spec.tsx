@@ -16,73 +16,49 @@ describe("HomePage", () => {
     render(<HomePage />);
 
     expect(screen.getByText("Hansa Field")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apps" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Templates" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Proyectos" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Registros" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Apps" })).toHaveAttribute(
+      "href",
+      "/apps",
+    );
+    expect(screen.getByRole("link", { name: "Templates" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Proyectos" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Registros" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 1, name: "Apps" }),
     ).toBeInTheDocument();
   });
 
-  it("navigates to different sections when clicking sidebar buttons", async () => {
+  it("exposes direct navigation to each workspace section", () => {
     render(<HomePage />);
 
-    const btnProyectos = screen.getByRole("button", { name: "Proyectos" });
-    fireEvent.click(btnProyectos);
+    expect(screen.getByRole("link", { name: "Proyectos" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+    expect(screen.getByRole("link", { name: "Cajones" })).toHaveAttribute(
+      "href",
+      "/blocks",
+    );
+    expect(screen.getByRole("link", { name: "Templates" })).toHaveAttribute(
+      "href",
+      "/templates",
+    );
+    expect(screen.getByRole("link", { name: "Registros" })).toHaveAttribute(
+      "href",
+      "/records",
+    );
+    expect(screen.getByRole("link", { name: "Importar" })).toHaveAttribute(
+      "href",
+      "/import",
+    );
     expect(
-      screen.getByRole("heading", { level: 1, name: "Proyectos" }),
-    ).toBeInTheDocument();
-
-    const btnCajones = screen.getByRole("button", { name: "Cajones" });
-    fireEvent.click(btnCajones);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Cajones" }),
-    ).toBeInTheDocument();
-
-    const btnTemplates = screen.getByRole("button", { name: "Templates" });
-    fireEvent.click(btnTemplates);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Templates" }),
-    ).toBeInTheDocument();
-
-    const btnRegistros = screen.getByRole("button", { name: "Registros" });
-    fireEvent.click(btnRegistros);
-    expect(screen.getByText("Registros en el área")).toBeInTheDocument();
-
-    const btnImportar = screen.getAllByRole("button", { name: "Importar" })[0];
-    fireEvent.click(btnImportar);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Importar Datos GIS" }),
-    ).toBeInTheDocument();
-
-    const btnMapa = screen.getByRole("button", { name: "Mapa Universal" });
-    fireEvent.click(btnMapa);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Mapa Universal" }),
-    ).toBeInTheDocument();
-
-    const btnApps = screen.getByRole("button", { name: "Apps" });
-    fireEvent.click(btnApps);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Apps" }),
-    ).toBeInTheDocument();
+      screen.getByRole("link", { name: "Mapa Universal" }),
+    ).toHaveAttribute("href", "/map");
   });
 
-  it("handles in-page button clicks: view modes, create modals, and navigation", async () => {
-    render(<HomePage />);
+  it("keeps record controls on the dedicated records route", () => {
+    render(<RecordsPage />);
 
-    // Go to Registros
-    const btnRegistros = screen.getByRole("button", { name: "Registros" });
-    fireEvent.click(btnRegistros);
-
-    // Click View mode buttons
     const btnTabla = screen.getByRole("button", { name: "Tabla" });
     fireEvent.click(btnTabla);
 
@@ -92,14 +68,12 @@ describe("HomePage", () => {
     const btnMapaView = screen.getByRole("button", { name: "Mapa" });
     fireEvent.click(btnMapaView);
 
-    // Open New Record Modal
     const btnNuevo = screen.getByRole("button", { name: /Nuevo registro/i });
     fireEvent.click(btnNuevo);
     expect(
       screen.getByRole("heading", { name: /Crear Nuevo Registro/i }),
     ).toBeInTheDocument();
 
-    // Close Modal
     const btnCerrar = screen.getByRole("button", { name: "Cancelar" });
     fireEvent.click(btnCerrar);
     expect(

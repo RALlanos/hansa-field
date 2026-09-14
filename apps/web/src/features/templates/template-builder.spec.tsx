@@ -98,3 +98,67 @@ it("renaming a field retains its UUID in the submitted new version", async () =>
     label: "Altura del poste",
   });
 });
+
+it("configures an App through its own version endpoint without writing its template", async () => {
+  const id = "00000000-0000-4000-8000-000000000011";
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          name: "Postes",
+          version: 1,
+          baseTemplate: { id: "template", name: "Red base", version: 1 },
+          schema: {
+            sections: [
+              {
+                id: "00000000-0000-4000-8000-000000000012",
+                title: "Datos",
+                fields: [
+                  {
+                    id,
+                    key: "altura",
+                    label: "Altura",
+                    type: "number",
+                    required: false,
+                  },
+                ],
+              },
+            ],
+            settings: {
+              id: "app",
+              name: "Postes",
+              code: "POSTES",
+              description: "",
+              allowedGeometries: ["Point"],
+              mapIcon: "pin",
+              mapColor: "#123456",
+            },
+          },
+        }),
+      ),
+    )
+    .mockResolvedValueOnce(new Response(JSON.stringify({ version: 2 })));
+  vi.stubGlobal("fetch", fetchMock);
+  const back = vi.fn<() => void>();
+  const openTemplate = vi.fn<(templateId: string) => void>();
+  render(
+    <TemplateBuilder
+      templateId="app"
+      mode="app"
+      onBack={back}
+      onOpenTemplate={openTemplate}
+    />,
+  );
+  await screen.findByRole("heading", { name: "Postes", level: 1 });
+  fireEvent.click(screen.getByRole("button", { name: "Abrir plantilla base" }));
+  expect(openTemplate).toHaveBeenCalledWith("template");
+  fireEvent.click(screen.getByRole("button", { name: "Guardar App" }));
+  await waitFor(() => expect(back).toHaveBeenCalled());
+  expect(String(fetchMock.mock.calls[0]![0])).toContain(
+    "/api/workspace/apps/app/builder",
+  );
+  expect(String(fetchMock.mock.calls[1]![0])).toContain(
+    "/api/workspace/apps/app/versions",
+  );
+});

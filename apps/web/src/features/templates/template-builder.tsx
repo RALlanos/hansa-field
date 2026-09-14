@@ -27,8 +27,11 @@ type TemplateVersion = {
   name: string;
   version: number;
   schema: AppSchema & { settings?: AppSummary };
+  baseTemplate?: { id: string; name: string; version: number | null } | null;
+  projectName?: string;
 };
 
+type BuilderMode = "template" | "app" | "projectApp";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -51,13 +54,19 @@ function createField(type: FieldType, index: number): BuilderField {
 export default function TemplateBuilder({
   templateId,
   onBack,
+  mode = "template",
+  onOpenTemplate,
 }: {
   templateId: string;
   onBack: () => void;
+  mode?: BuilderMode;
+  onOpenTemplate?: (templateId: string) => void;
 }) {
-  const appId = templateId;
+  const resourceId = templateId;
   const [versionNumber, setVersionNumber] = useState(0);
   const [app, setApp] = useState<AppSummary | null>(null);
+  const [baseTemplate, setBaseTemplate] =
+    useState<TemplateVersion["baseTemplate"]>(null);
   const [schema, setSchema] = useState<AppSchema>({ sections: [] });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,7 +120,7 @@ export default function TemplateBuilder({
 
   useEffect(() => {
     let mounted = true;
-    if (appId === "new") {
+    if (mode === "template" && resourceId === "new") {
       setApp({
         id: "new",
         code: "",
@@ -121,10 +130,17 @@ export default function TemplateBuilder({
         mapIcon: "pin",
         mapColor: "#397da7",
       });
+      setBaseTemplate(null);
       setLoading(false);
       return;
     }
-    fetch(`${getApiBase()}/api/workspace/templates/${appId}`)
+    const endpoint =
+      mode === "template"
+        ? `/api/workspace/templates/${resourceId}`
+        : mode === "app"
+          ? `/api/workspace/apps/${resourceId}/builder`
+          : `/api/workspace/project-apps/${resourceId}/builder`;
+    fetch(`${getApiBase()}${endpoint}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("No se pudo abrir la plantilla.");
         return response.json() as Promise<TemplateVersion>;
@@ -138,11 +154,12 @@ export default function TemplateBuilder({
           mapIcon: "pin",
           mapColor: "#397da7",
           ...data.schema.settings,
-          id: appId,
+          id: resourceId,
           name: data.name,
         });
         setSchema({ sections: data.schema.sections });
         setVersionNumber(data.version);
+        setBaseTemplate(data.baseTemplate ?? null);
       })
       .catch((error) => setMessage(String(error)))
       .finally(() => {
@@ -151,7 +168,7 @@ export default function TemplateBuilder({
     return () => {
       mounted = false;
     };
-  }, [appId]);
+  }, [mode, resourceId]);
 
   const selected = useMemo(
     () =>
@@ -226,35 +243,46 @@ export default function TemplateBuilder({
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(
-        `${getApiBase()}/api/workspace/templates${appId === "new" ? "" : "/" + appId + "/versions"}`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            name: app!.name,
-            schema: {
-              sections: schema.sections.map((s) => ({
-                ...s,
-                fields: s.fields.map((f) => ({
-                  ...f,
-                  ...(f.options
-                    ? {
-                        options: f.options.map((o) => o.trim()).filter(Boolean),
-                      }
-                    : {}),
-                })),
+      const endpoint =
+        mode === "template"
+          ? `/api/workspace/templates${resourceId === "new" ? "" : `/${resourceId}/versions`}`
+          : mode === "app"
+            ? `/api/workspace/apps/${resourceId}/versions`
+            : `/api/workspace/project-apps/${resourceId}/versions`;
+      const response = await fetch(`${getApiBase()}${endpoint}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: app!.name,
+          schema: {
+            sections: schema.sections.map((s) => ({
+              ...s,
+              fields: s.fields.map((f) => ({
+                ...f,
+                ...(f.options
+                  ? {
+                      options: f.options.map((o) => o.trim()).filter(Boolean),
+                    }
+                  : {}),
               })),
-              settings: app,
-            },
-            ...(appId === "new" ? {} : { expectedVersion: versionNumber }),
-          }),
-        },
-      );
+            })),
+            settings: app,
+          },
+          ...(mode === "template" && resourceId === "new"
+            ? {}
+            : { expectedVersion: versionNumber }),
+        }),
+      });
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.message ?? "No se pudo guardar.");
-      setMessage("Plantilla guardada.");
+      setMessage(
+        mode === "template"
+          ? "Plantilla guardada."
+          : mode === "app"
+            ? "App guardada."
+            : "App de Proyecto guardada.",
+      );
       onBack();
     } catch (reason: unknown) {
       setMessage(
@@ -282,17 +310,30 @@ export default function TemplateBuilder({
     <main className="app-builder">
       <header className="builder-header">
         <button className="secondary-button" type="button" onClick={onBack}>
-          ← Plantillas
+          ←{" "}
+          {mode === "template"
+            ? "Plantillas"
+            : mode === "app"
+              ? "Apps"
+              : "Proyecto"}
         </button>
         <div>
-          <p className="eyebrow">Constructor de plantilla</p>
+          <p className="eyebrow">
+            {mode === "template"
+              ? "Constructor de plantilla"
+              : mode === "app"
+                ? "Configurador de App"
+                : "Configurador de App de Proyecto"}
+          </p>
           <h1>{app.name}</h1>
         </div>
         <p className="builder-code">
           {app.code} · {app.allowedGeometries.join(", ")}
           {versionNumber > 0
             ? ` · Versión ${versionNumber}`
-            : " · Nueva plantilla"}
+            : mode === "template" && resourceId === "new"
+              ? " · Nueva plantilla"
+              : ""}
         </p>
 
         <button
@@ -301,9 +342,32 @@ export default function TemplateBuilder({
           onClick={save}
           type="button"
         >
-          {saving ? "Guardando…" : "Guardar plantilla"}
+          {saving
+            ? "Guardando…"
+            : mode === "template"
+              ? "Guardar plantilla"
+              : mode === "app"
+                ? "Guardar App"
+                : "Guardar App de Proyecto"}
         </button>
       </header>
+      {mode !== "template" && (
+        <section className="builder-message" aria-label="Plantilla base">
+          <strong>Base reutilizable:</strong>{" "}
+          {baseTemplate
+            ? `${baseTemplate.name} · versión ${baseTemplate.version ?? "actual"}`
+            : "Esta App no tiene plantilla base."}
+          {baseTemplate && onOpenTemplate && (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => onOpenTemplate(baseTemplate.id)}
+            >
+              Abrir plantilla base
+            </button>
+          )}
+        </section>
+      )}
       {message && (
         <p className="builder-message" role="status">
           {message}
@@ -495,9 +559,17 @@ export default function TemplateBuilder({
         </section>
         <aside
           className="builder-properties"
-          aria-label="Ajustes de la plantilla"
+          aria-label={
+            mode === "template"
+              ? "Ajustes de la plantilla"
+              : "Ajustes de la App"
+          }
         >
-          <h2>Ajustes de la plantilla</h2>
+          <h2>
+            {mode === "template"
+              ? "Ajustes de la plantilla"
+              : "Ajustes de la App"}
+          </h2>
           <div className="properties-form">
             <label>
               Nombre
@@ -549,8 +621,9 @@ export default function TemplateBuilder({
               onIconChange={(mapIcon) => setApp({ ...app, mapIcon })}
             />
             <p>
-              Estos ajustes pertenecen a toda la plantilla, no a un atributo
-              individual.
+              Estos ajustes pertenecen a{" "}
+              {mode === "template" ? "toda la plantilla" : "esta App"}, no a un
+              atributo individual.
             </p>
             <button
               className="secondary-button"
