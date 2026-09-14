@@ -239,6 +239,7 @@ export function UniversalMapWorkspace({ catalog }: { catalog: Catalog }) {
           datasetId={selectedRow.dataset_id}
           catalog={catalog}
           collection={activeCollection}
+          activeSegment={null}
           onClose={() => setSelectedRow(null)}
           onUpdated={() => setRefresh((v) => v + 1)}
         />

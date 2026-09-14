@@ -6,6 +6,7 @@ export type MapScopeInput = Readonly<{
   appIds?: readonly string[];
   projectIds?: readonly string[];
   localCollectionIds?: readonly string[];
+  segmentIds?: readonly string[];
   bbox: MapBounds;
   zoom: number;
   budget?: number;
@@ -26,5 +27,7 @@ export function buildMapRecordsUrl(
     parameters.set("projectIds", scope.projectIds.join(","));
   if (scope.localCollectionIds?.length)
     parameters.set("localCollectionIds", scope.localCollectionIds.join(","));
+  if (scope.segmentIds?.length)
+    parameters.set("segmentIds", scope.segmentIds.join(","));
   return `${apiUrl}/api/workspace/map?${parameters.toString()}`;
 }

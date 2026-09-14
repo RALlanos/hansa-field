@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import type { Catalog, Collection, Row } from "../operational/contracts";
 import { api } from "../operational/contracts";
 import { cacheKeys, localDataCache } from "../../lib/local-data-cache";
+import { segmentationApi } from "../segmentation/contracts";
+import type { SegmentFilter } from "../segmentation/segmentation-map-filter";
 
 type RecordDetailData = {
   id?: string;
@@ -30,6 +32,7 @@ type Props = {
   datasetId: string;
   catalog: Catalog;
   collection?: Collection;
+  activeSegment: SegmentFilter | null;
   onClose: () => void;
   onUpdated: () => void;
 };
@@ -42,6 +45,7 @@ export function RecordInspector({
   collection,
   onClose,
   onUpdated,
+  activeSegment,
 }: Props) {
   const [activeTab, setActiveTab] = useState<
     "attributes" | "geometry" | "context"
@@ -56,6 +60,7 @@ export function RecordInspector({
   const [targetProject, setTargetProject] = useState("");
   const [targetProjectAppId, setTargetProjectAppId] = useState("");
   const [incorporateSuccess, setIncorporateSuccess] = useState(false);
+  const [segmentAssignmentDone, setSegmentAssignmentDone] = useState(false);
 
   const isProjectContext = Boolean(projectId && row.project_record_id);
   const fields =
@@ -275,6 +280,31 @@ export function RecordInspector({
     }
   };
 
+  const assignToActiveSegment = async () => {
+    if (!activeSegment) return;
+    setBusy(true);
+    setError("");
+    setSegmentAssignmentDone(false);
+    try {
+      await segmentationApi(
+        `/segments/${activeSegment.id}/memberships`,
+        isProjectContext
+          ? { projectRecordId: row.project_record_id }
+          : { recordId: row.record_id },
+      );
+      await localDataCache.invalidateCategory("table");
+      await localDataCache.invalidateCategory("map");
+      setSegmentAssignmentDone(true);
+      onUpdated();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo asignar el segmento.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const candidateProjects = catalog.projects.filter((p) => p.id !== projectId);
   const targetProjectApps = catalog.collections.filter(
     (c) =>
@@ -376,6 +406,25 @@ export function RecordInspector({
                 se modifica.
               </div>
             )}
+
+            {activeSegment ? (
+              <div className="p-2.5 bg-violet-50 border border-violet-200 rounded text-xs text-violet-950 space-y-2">
+                <p>
+                  <span className="font-semibold">Segmento activo:</span>{" "}
+                  {activeSegment.name}
+                </p>
+                <button
+                  className="px-2.5 py-1 text-xs font-semibold text-white bg-violet-700 hover:bg-violet-600 rounded disabled:opacity-50"
+                  disabled={busy || segmentAssignmentDone}
+                  onClick={() => void assignToActiveSegment()}
+                  type="button"
+                >
+                  {segmentAssignmentDone
+                    ? "Asignado a este segmento"
+                    : "Agregar a este segmento"}
+                </button>
+              </div>
+            ) : null}
 
             {fields.length > 0 ? (
               fields.map((field) => {

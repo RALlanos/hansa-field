@@ -58,6 +58,7 @@ type Props = Readonly<{
   appIds: readonly string[];
   projectIds?: readonly string[];
   localCollectionIds?: readonly string[];
+  segmentIds?: readonly string[];
   onStatus: (status: MultiAppMapStatus) => void;
   onViewportChange?: (bounds: MapBounds) => void;
   onSelect?: (feature: MapFeature) => void;
@@ -93,6 +94,7 @@ export function MultiAppMap({
   appIds,
   projectIds = [],
   localCollectionIds = [],
+  segmentIds = [],
   onStatus,
   onViewportChange,
   onSelect,
@@ -113,6 +115,7 @@ export function MultiAppMap({
   const appIdsKey = appIds.join(",");
   const projectIdsKey = projectIds.join(",");
   const localCollectionIdsKey = localCollectionIds.join(",");
+  const segmentIdsKey = segmentIds.join(",");
 
   useEffect(() => {
     if (!container.current || map.current) return;
@@ -173,6 +176,7 @@ export function MultiAppMap({
     const selectedLocalCollectionIds = localCollectionIdsKey
       ? localCollectionIdsKey.split(",")
       : [];
+    const selectedSegmentIds = segmentIdsKey ? segmentIdsKey.split(",") : [];
     let controller: AbortController | null = null;
     let timer: number | null = null;
     let active = true;
@@ -288,6 +292,7 @@ export function MultiAppMap({
         appIds: selectedAppIds,
         projectIds: selectedProjectIds,
         localCollectionIds: selectedLocalCollectionIds,
+        segmentIds: selectedSegmentIds,
       });
       const cacheScope = workspaceScopeKey({
         mode,
@@ -303,6 +308,7 @@ export function MultiAppMap({
         bbox: viewport,
         zoom: Math.round(instance.getZoom()),
         representation: "server",
+        segmentIds: selectedSegmentIds,
       });
       let cached = await localDataCache.read<MapResponse>(key);
       if (cached) {
@@ -368,6 +374,7 @@ export function MultiAppMap({
     onViewportChange,
     projectIdsKey,
     refresh,
+    segmentIdsKey,
   ]);
 
   return (

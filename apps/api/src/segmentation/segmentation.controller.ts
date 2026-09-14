@@ -131,6 +131,9 @@ export class SegmentationController {
       q.limit,
     );
   }
+  @Get("schemes/:id/filter-options") filterOptions(@Param("id") id: string) {
+    return this.service.filterOptions(LOCAL_ORGANIZATION, uuid.parse(id));
+  }
   @Get("segments/:id") segment(@Param("id") id: string) {
     return this.service.repository.segment(
       this.service.repository.database,

@@ -374,6 +374,9 @@ export class OperationalController {
               .filter(Boolean),
           }
         : {}),
+      ...(typeof query.segmentIds === "string"
+        ? { segmentIds: query.segmentIds.split(",").filter(Boolean) }
+        : {}),
     });
     const cursor = typeof rawCursor === "string" ? uuid.parse(rawCursor) : null;
     const limit = z.coerce
@@ -460,6 +463,9 @@ export class OperationalController {
               .split(",")
               .filter(Boolean),
           }
+        : {}),
+      ...(typeof query.segmentIds === "string"
+        ? { segmentIds: query.segmentIds.split(",").filter(Boolean) }
         : {}),
     });
     if (input.bbox[0] >= input.bbox[2] || input.bbox[1] >= input.bbox[3])

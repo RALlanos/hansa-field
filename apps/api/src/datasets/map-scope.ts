@@ -5,12 +5,7 @@ export type MapMode = "app" | "project" | "universal";
 export const attributeFilterSchema = z
   .object({
     fieldId: z.string().uuid(),
-    operator: z.enum([
-      "equals",
-      "notEquals",
-      "isEmpty",
-      "isNotEmpty",
-    ]),
+    operator: z.enum(["equals", "notEquals", "isEmpty", "isNotEmpty"]),
     value: z.unknown().optional(),
   })
   .strict();
@@ -32,6 +27,8 @@ export const mapScopeSchema = z
     appIds: z.array(z.string().uuid()).max(200).optional(),
     projectIds: z.array(z.string().uuid()).max(200).optional(),
     localCollectionIds: z.array(z.string().uuid()).max(200).optional(),
+    /** Active segments selected as operational map filters. A parent includes its descendants. */
+    segmentIds: z.array(z.string().uuid()).max(50).optional(),
     territories: z.array(territoryRefSchema).max(200).optional(),
     filters: z.array(attributeFilterSchema).max(50).optional(),
     bbox: z.tuple([

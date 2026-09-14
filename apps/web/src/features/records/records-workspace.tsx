@@ -16,6 +16,10 @@ import {
 import { RecordMap } from "../operational/record-map";
 import { RecordInspector } from "./record-inspector";
 import { RecordCreateModal } from "./record-create-modal";
+import {
+  SegmentationMapFilter,
+  type SegmentFilter,
+} from "../segmentation/segmentation-map-filter";
 
 type Props = {
   catalog: Catalog;
@@ -83,6 +87,9 @@ export function RecordsWorkspace({
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter | null>(
+    null,
+  );
 
   useEffect(() => {
     setProjectId(initialProjectId);
@@ -115,6 +122,11 @@ export function RecordsWorkspace({
   );
 
   const activeCollection = catalog.collections.find((c) => c.id === datasetId);
+  const segmentationContext = projectId
+    ? { projectId }
+    : activeCollection?.app_id
+      ? { appId: activeCollection.app_id }
+      : null;
   const fields =
     activeCollection?.schema_definition.sections.flatMap((s) => s.fields) ?? [];
 
@@ -138,6 +150,7 @@ export function RecordsWorkspace({
       query.set("projectIds", scope.projectIds.join(","));
     if (scope.localCollectionIds?.length)
       query.set("localCollectionIds", scope.localCollectionIds.join(","));
+    if (segmentFilter) query.set("segmentIds", segmentFilter.id);
     if (bbox) query.set("bbox", bbox);
     if (cursor) query.set("cursor", cursor);
     query.set("limit", "100");
@@ -223,7 +236,7 @@ export function RecordsWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [catalog, projectId, datasetId, bbox, cursor, refresh]);
+  }, [catalog, projectId, datasetId, bbox, cursor, refresh, segmentFilter]);
 
   // Handle escape key to close inspector
   useEffect(() => {
@@ -271,6 +284,12 @@ export function RecordsWorkspace({
               ))}
             </select>
           </div>
+
+          <SegmentationMapFilter
+            context={segmentationContext}
+            onChange={setSegmentFilter}
+            value={segmentFilter}
+          />
 
           {/* Collection / Layer Selector */}
           <div className="flex items-center gap-1.5 shrink-0 text-xs">
@@ -418,6 +437,7 @@ export function RecordsWorkspace({
                 catalog={catalog}
                 projectId={projectId}
                 datasetId={datasetId}
+                segmentIds={segmentFilter ? [segmentFilter.id] : []}
                 refresh={refresh}
                 onBounds={handleBoundsChange}
                 onSelect={(row) => {
@@ -589,6 +609,7 @@ export function RecordsWorkspace({
           datasetId={datasetId}
           catalog={catalog}
           collection={activeCollection}
+          activeSegment={segmentFilter}
           onClose={() => setSelectedRow(null)}
           onUpdated={() => {
             setRefresh((v) => v + 1);

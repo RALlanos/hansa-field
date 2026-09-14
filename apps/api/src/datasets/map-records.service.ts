@@ -113,7 +113,10 @@ export class MapRecordsService {
     @Inject(DatabaseService) private readonly database: DatabaseQuery,
   ) {}
 
-  async map(organizationId: string, scope: MapScope): Promise<MapFeatureResult> {
+  async map(
+    organizationId: string,
+    scope: MapScope,
+  ): Promise<MapFeatureResult> {
     const mode = resolveMode(scope);
     const projectIds = scope.projectIds ?? null;
     const appIds = scope.appIds ?? null;
@@ -134,7 +137,10 @@ export class MapRecordsService {
       params: baseParams,
       bbox: scope.bbox,
     };
-    const { where, filterParams } = this.buildFilters(scope.filters ?? []);
+    const { where, filterParams } = this.buildFilters(
+      scope.filters ?? [],
+      scope.segmentIds ?? [],
+    );
     const countParams = [...base.params, ...filterParams];
     const count = await this.database.query<{ total: number }>(
       `${base.visible} SELECT count(*)::integer total FROM visible WHERE ${where || "true"}`,
@@ -164,7 +170,10 @@ export class MapRecordsService {
         ...scope.bbox,
       ],
     };
-    const { where, filterParams } = this.buildFilters(scope.filters ?? []);
+    const { where, filterParams } = this.buildFilters(
+      scope.filters ?? [],
+      scope.segmentIds ?? [],
+    );
     const cursorParam = 9 + filterParams.length;
     const limitParam = cursorParam + 1;
     const result = await this.database.query<VisibleRow>(
@@ -176,10 +185,9 @@ export class MapRecordsService {
     );
     const hasMore = result.rows.length > limit;
     const rows = result.rows.slice(0, limit);
-    const overrides = await this.loadOverrides(
-      organizationId,
-      [...new Set(rows.map((row) => row.project_app_id).filter(Boolean))] as string[],
-    );
+    const overrides = await this.loadOverrides(organizationId, [
+      ...new Set(rows.map((row) => row.project_app_id).filter(Boolean)),
+    ] as string[]);
     return {
       data: rows.map((row) => ({
         ...this.toFeature(row, overrides, 1),
@@ -187,7 +195,9 @@ export class MapRecordsService {
         updatedAt: row.updated_at,
       })),
       totalRecords: await this.scopeCount(base, where, filterParams),
-      nextCursor: hasMore ? rows.at(-1)?.project_record_uuid ?? rows.at(-1)?.record_uuid ?? null : null,
+      nextCursor: hasMore
+        ? (rows.at(-1)?.project_record_uuid ?? rows.at(-1)?.record_uuid ?? null)
+        : null,
     };
   }
 
@@ -205,10 +215,9 @@ export class MapRecordsService {
        SELECT *, ST_AsGeoJSON(geometry)::jsonb geometry FROM filtered ORDER BY dataset_id,record_uuid LIMIT $${limitParam}`,
       [...base.params, ...filterParams, limit],
     );
-    const overrides = await this.loadOverrides(
-      organizationId,
-      [...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean))] as string[],
-    );
+    const overrides = await this.loadOverrides(organizationId, [
+      ...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean)),
+    ] as string[]);
     const rows = result.rows.slice(0, scope.budget);
     return {
       data: rows.map((row) => this.toFeature(row, overrides, 1)),
@@ -247,10 +256,9 @@ export class MapRecordsService {
       SELECT * FROM points ORDER BY count DESC LIMIT $${budgetParam}`,
       [...base.params, ...filterParams, cellWidth, cellHeight, scope.budget],
     );
-    const overrides = await this.loadOverrides(
-      organizationId,
-      [...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean))] as string[],
-    );
+    const overrides = await this.loadOverrides(organizationId, [
+      ...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean)),
+    ] as string[]);
     return {
       data: result.rows.map((row) => {
         const symbol = resolveSymbol(overrides, {
@@ -267,9 +275,7 @@ export class MapRecordsService {
           projectId: row.project_id,
           projectAppId: row.project_app_id,
           projectRecordUuid: null,
-          contextRef: row.project_id
-            ? `project:${row.project_id}`
-            : "app",
+          contextRef: row.project_id ? `project:${row.project_id}` : "app",
           revision: 0,
           geometry: row.geometry,
           symbol,
@@ -345,23 +351,64 @@ export class MapRecordsService {
     if (!settings || typeof settings !== "object") return null;
     const symbol = (settings as { symbol?: unknown }).symbol;
     if (!symbol || typeof symbol !== "object") return null;
-    const candidate = symbol as { icon?: unknown; color?: unknown; label?: unknown };
-    if (typeof candidate.icon !== "string" && typeof candidate.color !== "string")
+    const candidate = symbol as {
+      icon?: unknown;
+      color?: unknown;
+      label?: unknown;
+    };
+    if (
+      typeof candidate.icon !== "string" &&
+      typeof candidate.color !== "string"
+    )
       return null;
     return {
       icon: typeof candidate.icon === "string" ? candidate.icon : "pin",
-      color: typeof candidate.color === "string" ? candidate.color : defaultColor,
-      ...(typeof candidate.label === "string" ? { label: candidate.label } : {}),
+      color:
+        typeof candidate.color === "string" ? candidate.color : defaultColor,
+      ...(typeof candidate.label === "string"
+        ? { label: candidate.label }
+        : {}),
     };
   }
 
-  private buildFilters(filters: AttributeFilter[]): {
+  private buildFilters(
+    filters: AttributeFilter[],
+    segmentIds: string[],
+  ): {
     where: string;
     filterParams: unknown[];
   } {
     const clauses: string[] = [];
     const filterParams: unknown[] = [];
     let index = 9;
+    if (segmentIds.length) {
+      const param = `$${index}`;
+      clauses.push(`EXISTS (
+        WITH RECURSIVE selected_segments AS (
+          SELECT id FROM segments WHERE id = ANY(${param}::uuid[]) AND status = 'active'
+          UNION ALL
+          SELECT child.id FROM segments child
+          JOIN selected_segments parent ON child.parent_segment_id = parent.id
+          WHERE child.status = 'active'
+        )
+        SELECT 1
+        FROM segment_memberships membership
+        JOIN selected_segments selected ON selected.id = membership.segment_id
+        JOIN segmentation_schemes scheme ON scheme.id = selected.scheme_id
+        WHERE scheme.organization_id = $1 AND scheme.status = 'active'
+          AND (
+            (visible.project_record_uuid IS NULL
+              AND scheme.app_id = visible.app_id
+              AND membership.record_id = visible.record_uuid)
+            OR
+            (visible.project_record_uuid IS NOT NULL
+              AND scheme.project_id = visible.project_id
+              AND membership.project_record_id = visible.project_record_uuid)
+          )
+      )`);
+      filterParams.push(segmentIds);
+      index++;
+    }
     for (const filter of filters) {
       const key = filter.fieldId;
       const param = `$${index}`;
@@ -453,7 +500,8 @@ export class MapRecordsService {
         AND ($3::uuid[] IS NOT NULL AND d.app_id=ANY($3))
         AND r.geometry IS NOT NULL
         AND ST_Intersects(r.geometry, ST_MakeEnvelope($5,$6,$7,$8,4326))`;
-    if (mode === "app") return `WITH scope_parameters AS (SELECT $2::uuid[] project_ids,$4::uuid[] local_ids), visible AS (${app})`;
+    if (mode === "app")
+      return `WITH scope_parameters AS (SELECT $2::uuid[] project_ids,$4::uuid[] local_ids), visible AS (${app})`;
     return `WITH visible AS (${app} UNION ALL ${project})`;
   }
 }

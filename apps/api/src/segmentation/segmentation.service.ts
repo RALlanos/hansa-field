@@ -305,6 +305,32 @@ export class SegmentationService {
         result.rows.length > limit ? result.rows[limit - 1]!.id : null,
     };
   }
+  /** Compact, ordered choices for the operational map/table filter. */
+  async filterOptions(org: string, schemeId: string) {
+    await this.repository.scheme(this.repository.database, org, schemeId);
+    return (
+      await this.repository.database.query<{
+        id: string;
+        name: string;
+        levelName: string;
+        depth: number;
+      }>(
+        `WITH RECURSIVE tree AS (
+          SELECT g.id,g.name,l.name level_name,0 depth,ARRAY[lower(g.name)] path
+          FROM segments g JOIN segmentation_levels l ON l.id=g.level_id
+          WHERE g.scheme_id=$1 AND g.parent_segment_id IS NULL AND g.status='active' AND l.status='active'
+          UNION ALL
+          SELECT child.id,child.name,level.name,tree.depth+1,tree.path || lower(child.name)
+          FROM segments child
+          JOIN segmentation_levels level ON level.id=child.level_id
+          JOIN tree ON child.parent_segment_id=tree.id
+          WHERE child.status='active' AND level.status='active'
+        )
+        SELECT id,name,level_name "levelName",depth FROM tree ORDER BY path`,
+        [schemeId],
+      )
+    ).rows;
+  }
   async ancestors(org: string, id: string) {
     await this.repository.segment(this.repository.database, org, id);
     return (
