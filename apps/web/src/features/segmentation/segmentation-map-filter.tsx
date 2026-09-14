@@ -52,7 +52,16 @@ export function SegmentationMapFilter({
       .catch(() => setOptions([]));
   }, [schemeId]);
 
-  if (!context || !schemes.length) return null;
+  if (!context) return null;
+
+  if (!schemes.length) {
+    return (
+      <div className="flex items-center gap-1.5 shrink-0 text-xs">
+        <span className="text-slate-400 font-medium">Segmento:</span>
+        <span className="text-slate-500">Sin estructura configurada</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-1.5 shrink-0 text-xs">
