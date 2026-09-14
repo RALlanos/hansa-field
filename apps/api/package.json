@@ -10,6 +10,7 @@
     "db:rollback": "tsx --env-file=../../.env.example src/database/migrate.ts down",
     "db:provision-tigo-import": "tsx --env-file=../../.env.example src/database/provision-tigo-import-apps.ts",
     "db:seed-stress": "tsx --env-file=../../.env.example src/database/seed-network-stress.ts",
+    "clone:fulcrum": "tsx --env-file=../../.env.example src/transfers/clone-fulcrum.cli.ts",
     "import:tigo-reference": "tsx src/transfers/import-tigo-reference.cli.ts",
     "start": "node dist-active/main.js",
     "test": "vitest run",
