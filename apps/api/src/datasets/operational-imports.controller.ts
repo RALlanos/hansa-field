@@ -10,10 +10,9 @@ import {
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import { createHash, randomUUID } from "node:crypto";
-import { open } from "shapefile";
 import { z } from "zod";
 import { DatabaseService } from "../database/database.service.js";
-import { readShapefileParts } from "../transfers/shapefile-inspector.js";
+import { readShapefileArchive } from "../transfers/shapefile-inspector.js";
 import { geometrySchema } from "../records/record-input.js";
 import { datasetSchema, validateValues } from "./dataset-contracts.js";
 import { DatasetRecordsService } from "./dataset-records.service.js";
@@ -22,6 +21,11 @@ import { LOCAL_ORGANIZATION } from "./operational.controller.js";
 const rowSchema = z.object({
   properties: z.record(z.string(), z.unknown()),
   geometry: geometrySchema.nullable(),
+});
+const allowedGeometriesSchema = z.object({
+  settings: z.object({
+    allowedGeometries: z.array(z.enum(["Point", "LineString", "Polygon"])),
+  }),
 });
 const mappingSchema = z.object({
   datasetId: z.string().uuid(),
@@ -46,29 +50,19 @@ export class OperationalImportsController {
     const bytes = await file.toBuffer();
     const rows: z.infer<typeof rowSchema>[] = [];
     if (file.filename.toLowerCase().endsWith(".zip")) {
-      const parts = await readShapefileParts(bytes);
-      const crs = parts.prj.toString("utf8");
-      if (/PROJCS|PROJCRS/i.test(crs) || !/WGS[_ ]?(1984|84)/i.test(crs))
+      const archive = await readShapefileArchive(file.filename, bytes);
+      if (archive.records.length > 20_000)
         throw new BadRequestException(
-          "Convierte el archivo a EPSG:4326 para este flujo inicial.",
+          "Máximo 20.000 registros por carga piloto.",
         );
-      const source = await open(parts.shp, parts.dbf, {
-        encoding: "windows-1252",
-      });
-      while (true) {
-        const entry = await source.read();
-        if (entry.done) break;
-        rows.push(
+      rows.push(
+        ...archive.records.map((record) =>
           rowSchema.parse({
-            properties: entry.value.properties ?? {},
-            geometry: entry.value.geometry,
+            properties: record.properties,
+            geometry: record.geometry,
           }),
-        );
-        if (rows.length > 20000)
-          throw new BadRequestException(
-            "Máximo 20.000 registros por carga piloto.",
-          );
-      }
+        ),
+      );
     } else {
       const data = z
         .object({
@@ -80,6 +74,18 @@ export class OperationalImportsController {
         .parse(JSON.parse(bytes.toString("utf8")));
       rows.push(...data.features);
     }
+    const geometryTypes = new Set(
+      rows.flatMap((row) => (row.geometry ? [row.geometry.type] : [])),
+    );
+    if (!geometryTypes.size)
+      throw new BadRequestException(
+        "El archivo no contiene geometrías válidas para importar.",
+      );
+    if (geometryTypes.size > 1)
+      throw new BadRequestException(
+        "Cada importación debe contener una sola clase de geometría: Point, LineString o Polygon.",
+      );
+    const geometryType = [...geometryTypes][0]!;
     const result = await this.db.query<{ id: string }>(
       "INSERT INTO import_jobs(organization_id,filename,checksum,rows) VALUES($1,$2,$3,$4) RETURNING id",
       [
@@ -102,6 +108,7 @@ export class OperationalImportsController {
       fields: [...new Set(rows.flatMap((row) => Object.keys(row.properties)))],
       statuses,
       crs: "EPSG:4326",
+      geometryType,
       preview: rows.slice(0, 5),
     };
   }
@@ -127,6 +134,10 @@ export class OperationalImportsController {
         throw new BadRequestException("Importación inexistente.");
       if (job.rows[0].result) return job.rows[0].result;
       const rows = z.array(rowSchema).parse(job.rows[0].rows);
+      const geometryTypes = new Set(
+        rows.flatMap((row) => (row.geometry ? [row.geometry.type] : [])),
+      );
+      const geometryType = [...geometryTypes][0];
       const prepared = [];
       for (const route of plan.routes) {
         const version = await tx.query<{
@@ -146,6 +157,17 @@ export class OperationalImportsController {
         )
           throw new BadRequestException(
             "Dos columnas no pueden escribir el mismo campo.",
+          );
+        const allowed = allowedGeometriesSchema.safeParse(
+          version.rows[0].schema_definition,
+        );
+        if (
+          geometryType &&
+          allowed.success &&
+          !allowed.data.settings.allowedGeometries.includes(geometryType)
+        )
+          throw new BadRequestException(
+            `La App destino no admite geometrías ${geometryType}.`,
           );
         prepared.push({
           route,

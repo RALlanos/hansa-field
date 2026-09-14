@@ -1,8 +1,13 @@
 import { createHash } from "node:crypto";
 
-import type { Feature, Point } from "geojson";
+import type { Feature } from "geojson";
 import { open as openShapefile } from "shapefile";
 import { fromBufferPromise, type Entry } from "yauzl";
+
+import {
+  geometrySchema,
+  type GeoJsonGeometry,
+} from "../records/record-input.js";
 
 import {
   TIGO_HFC_FTTH_V1,
@@ -25,7 +30,7 @@ export type ShapefileInspection = Readonly<{
   sourceFileName: string;
   layerName: string;
   featureCount: number;
-  geometryType: "Point";
+  geometryType: GeoJsonGeometry["type"];
   bbox: readonly [number, number, number, number];
   crs: Readonly<{
     name: string;
@@ -47,12 +52,12 @@ export type ShapefileInspection = Readonly<{
   >;
   preview: Readonly<{
     type: "FeatureCollection";
-    features: ReadonlyArray<Feature<Point, SourceProperties>>;
+    features: ReadonlyArray<Feature<GeoJsonGeometry, SourceProperties>>;
   }>;
 }>;
 
 export type ShapefileSourceRecord = Readonly<{
-  geometry: Point;
+  geometry: GeoJsonGeometry;
   properties: SourceProperties;
 }>;
 
@@ -206,6 +211,35 @@ function safeProperties(properties: Feature["properties"]): SourceProperties {
   return result;
 }
 
+function geometryPositions(
+  geometry: GeoJsonGeometry,
+): ReadonlyArray<readonly [number, number]> {
+  if (geometry.type === "Point") return [geometry.coordinates];
+  if (geometry.type === "LineString") return geometry.coordinates;
+  return geometry.coordinates.flat();
+}
+
+function parseGeometry(value: unknown, position: number): GeoJsonGeometry {
+  const parsed = geometrySchema.safeParse(value);
+  if (!parsed.success) {
+    throw new InvalidShapefileArchiveError(
+      `La geometría ${position} no es Point, LineString o Polygon válida para WGS 84.`,
+    );
+  }
+  if (parsed.data?.type === "Polygon") {
+    for (const ring of parsed.data.coordinates) {
+      const first = ring[0];
+      const last = ring.at(-1);
+      if (!first || !last || first[0] !== last[0] || first[1] !== last[1]) {
+        throw new InvalidShapefileArchiveError(
+          `El polígono ${position} contiene un anillo sin cerrar.`,
+        );
+      }
+    }
+  }
+  return parsed.data;
+}
+
 function inferFieldType(values: readonly SourceValue[]): SuggestedFieldType {
   const present = values.filter((value) => value !== null && value !== "");
   if (present.length && present.every((value) => value instanceof Date))
@@ -256,7 +290,7 @@ export async function readShapefileArchive(
   const source = await openShapefile(parts.shp, parts.dbf, {
     encoding: "windows-1252",
   });
-  const features: Array<Feature<Point, SourceProperties>> = [];
+  const features: Array<Feature<GeoJsonGeometry, SourceProperties>> = [];
   const records: ShapefileSourceRecord[] = [];
   const statuses: unknown[] = [];
   const statusCounts = new Map<string, number>();
@@ -267,34 +301,24 @@ export async function readShapefileArchive(
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
+  let geometryType: GeoJsonGeometry["type"] | null = null;
 
   while (true) {
     const item = await source.read();
     if (item.done) break;
     const feature = item.value;
-    if (!feature.geometry || feature.geometry.type !== "Point") {
+    const geometry = parseGeometry(feature.geometry, featureCount + 1);
+    if (geometryType && geometry.type !== geometryType) {
       throw new InvalidShapefileArchiveError(
-        "La primera versión admite una capa homogénea de geometrías POINT.",
+        "El Shapefile debe contener una sola clase de geometría: Point, LineString o Polygon.",
       );
     }
-    const x = feature.geometry.coordinates[0];
-    const y = feature.geometry.coordinates[1];
-    if (x === undefined || y === undefined) {
-      throw new InvalidShapefileArchiveError(
-        `La geometría ${featureCount + 1} no contiene dos coordenadas.`,
-      );
-    }
-    if (
-      !Number.isFinite(x) ||
-      !Number.isFinite(y) ||
-      x < -180 ||
-      x > 180 ||
-      y < -90 ||
-      y > 90
-    ) {
-      throw new InvalidShapefileArchiveError(
-        `La geometría ${featureCount + 1} no es válida para WGS 84.`,
-      );
+    geometryType = geometry.type;
+    for (const [x, y] of geometryPositions(geometry)) {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
     }
     const properties = safeProperties(feature.properties);
     const sourceStatus = properties[TIGO_HFC_FTTH_V1.classifierField];
@@ -318,15 +342,11 @@ export async function readShapefileArchive(
     if (features.length < MAX_PREVIEW_FEATURES) {
       features.push({
         type: "Feature",
-        geometry: feature.geometry,
+        geometry,
         properties,
       });
     }
-    records.push({ geometry: feature.geometry, properties });
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
+    records.push({ geometry, properties });
     featureCount += 1;
   }
 
@@ -341,7 +361,7 @@ export async function readShapefileArchive(
     sourceFileName,
     layerName: parts.layerName,
     featureCount,
-    geometryType: "Point",
+    geometryType: geometryType ?? "Point",
     bbox: [minX, minY, maxX, maxY],
     crs,
     profile: {

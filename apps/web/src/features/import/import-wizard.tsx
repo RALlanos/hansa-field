@@ -12,6 +12,7 @@ type Inspection = {
   fields: string[];
   statuses: [string, number][];
   crs: string;
+  geometryType: "Point" | "LineString" | "Polygon";
 };
 
 type Summary = {
@@ -146,7 +147,10 @@ export function ImportWizard({
   const handleConfirm = async () => {
     if (!inspection) return;
     await run(async () => {
-      const res = await api<Summary>(`/imports/${inspection.id}/confirm`, {});
+      const res = await api<Summary>(
+        `/imports/${inspection.id}/confirm`,
+        buildRoutesPayload(),
+      );
       setSummary({ ...res, confirmed: true });
       await localDataCache.invalidateCategory("table");
       await localDataCache.invalidateCategory("map");
@@ -305,9 +309,9 @@ export function ImportWizard({
                   Asignar Capas a Colecciones
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  Se detectaron {inspection.count} registros en el archivo.
-                  Asigna cada conjunto o estado a una colección o App de
-                  destino.
+                  Se detectaron {inspection.count} registros en el archivo.{" "}
+                  Geometría detectada: {inspection.geometryType}. Asigna cada
+                  conjunto o estado a una colección o App de destino.
                 </p>
               </div>
 
@@ -413,6 +417,10 @@ export function ImportWizard({
                     <span className="text-emerald-600">Campos en archivo:</span>{" "}
                     <strong>{inspection.fields.length}</strong>
                   </div>
+                  <div>
+                    <span className="text-emerald-600">Geometría:</span>{" "}
+                    <strong>{inspection.geometryType}</strong>
+                  </div>
                 </div>
               </div>
 
@@ -481,7 +489,7 @@ export function ImportWizard({
                                   setMappings({
                                     ...mappings,
                                     [st]: {
-                                      ...(mappings[st] ?? {}),
+                                      ...mappings[st],
                                       [sourceField]: e.target.value,
                                     },
                                   });
