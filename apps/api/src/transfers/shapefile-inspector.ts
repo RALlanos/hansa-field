@@ -15,7 +15,9 @@ import {
   summarizeRouting,
 } from "./routing-profile.js";
 
-const MAX_ARCHIVE_ENTRIES = 16;
+// GIS exporters commonly add CPG, QIX, SBN/SBX and metadata sidecars.
+// The byte and compression limits below remain the primary archive safeguards.
+const MAX_ARCHIVE_ENTRIES = 64;
 const MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
 const MAX_COMPRESSION_RATIO = 200;
 const MAX_PREVIEW_FEATURES = 500;

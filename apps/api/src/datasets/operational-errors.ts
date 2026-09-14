@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
 import { ZodError } from "zod";
+import { InvalidShapefileArchiveError } from "../transfers/shapefile-inspector.js";
 @Catch()
 export class OperationalErrors implements ExceptionFilter {
   private readonly logger = new Logger(OperationalErrors.name);
@@ -17,13 +18,15 @@ export class OperationalErrors implements ExceptionFilter {
       return;
     }
     if (error instanceof ZodError) {
-      void response
-        .status(400)
-        .send({
-          message: error.issues
-            .map((i) => `${i.path.join(".")}: ${i.message}`)
-            .join("; "),
-        });
+      void response.status(400).send({
+        message: error.issues
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; "),
+      });
+      return;
+    }
+    if (error instanceof InvalidShapefileArchiveError) {
+      void response.status(400).send({ message: error.message });
       return;
     }
     if (
@@ -31,20 +34,16 @@ export class OperationalErrors implements ExceptionFilter {
       "code" in error &&
       ["23505", "23503", "23514"].includes(String(error.code))
     ) {
-      void response
-        .status(409)
-        .send({
-          message:
-            "Conflicto de datos: relación duplicada, referencia inválida o geometría inválida.",
-        });
+      void response.status(409).send({
+        message:
+          "Conflicto de datos: relación duplicada, referencia inválida o geometría inválida.",
+      });
       return;
     }
     this.logger.error(error);
-    void response
-      .status(500)
-      .send({
-        message:
-          "Error interno. La operación no fue confirmada; consulta el log de API.",
-      });
+    void response.status(500).send({
+      message:
+        "Error interno. La operación no fue confirmada; consulta el log de API.",
+    });
   }
 }
