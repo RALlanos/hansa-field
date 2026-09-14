@@ -31,6 +31,20 @@ const STEPS = [
   { num: 6, label: "Resumen", desc: "Confirmación final" },
 ] as const;
 
+function sourceKey(source: string): string {
+  const normalized = source
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^_+/, "source_")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64);
+  return /^[a-z]/.test(normalized)
+    ? normalized
+    : `field_${normalized}`.slice(0, 64);
+}
+
 export function ImportWizard({
   collections,
   projectId,
@@ -341,12 +355,30 @@ export function ImportWizard({
                       </label>
                       <select
                         value={targets[st] ?? ""}
-                        onChange={(e) =>
-                          setTargets({
-                            ...targets,
-                            [st]: e.target.value,
-                          })
-                        }
+                        onChange={(e) => {
+                          const datasetId = e.target.value;
+                          const target = uniqueCollections.find(
+                            (collection) => collection.id === datasetId,
+                          );
+                          const fields =
+                            target?.schema_definition.sections.flatMap(
+                              (section) => section.fields,
+                            ) ?? [];
+                          setTargets({ ...targets, [st]: datasetId });
+                          setMappings({
+                            ...mappings,
+                            [st]: Object.fromEntries(
+                              inspection.fields.map((source) => [
+                                source,
+                                fields.find(
+                                  (field) =>
+                                    field.key === sourceKey(source) ||
+                                    field.label === source,
+                                )?.id ?? "",
+                              ]),
+                            ),
+                          });
+                        }}
                         className="w-full text-xs px-3 py-2 border border-slate-300 rounded bg-white focus:ring-1 focus:ring-sky-500"
                       >
                         <option value="">Selecciona destino…</option>

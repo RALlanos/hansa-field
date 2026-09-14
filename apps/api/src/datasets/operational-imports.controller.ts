@@ -14,7 +14,11 @@ import { z } from "zod";
 import { DatabaseService } from "../database/database.service.js";
 import { readShapefileArchive } from "../transfers/shapefile-inspector.js";
 import { geometrySchema } from "../records/record-input.js";
-import { datasetSchema, validateValues } from "./dataset-contracts.js";
+import {
+  datasetSchema,
+  validateValues,
+  type DatasetSchema,
+} from "./dataset-contracts.js";
 import { DatasetRecordsService } from "./dataset-records.service.js";
 import { LOCAL_ORGANIZATION } from "./operational.controller.js";
 
@@ -38,6 +42,31 @@ const mappingSchema = z.object({
 const planSchema = z
   .object({ routes: z.array(mappingSchema).min(1).max(100) })
   .strict();
+type DatasetField = DatasetSchema["sections"][number]["fields"][number];
+
+function importValue(value: unknown, field: DatasetField): unknown {
+  if (value === null || value === undefined || value === "") return null;
+  if (field.type === "number") {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const parsed = Number(value.trim().replace(",", "."));
+      return Number.isFinite(parsed) ? parsed : value;
+    }
+    return value;
+  }
+  if (field.type === "boolean") {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "si", "sí"].includes(normalized)) return true;
+      if (["false", "0", "no"].includes(normalized)) return false;
+    }
+    return value;
+  }
+  if (field.type === "date" && value instanceof Date)
+    return value.toISOString().slice(0, 10);
+  return typeof value === "string" ? value : String(value);
+}
 
 @Controller("workspace/imports")
 export class OperationalImportsController {
@@ -169,9 +198,15 @@ export class OperationalImportsController {
           throw new BadRequestException(
             `La App destino no admite geometrías ${geometryType}.`,
           );
+        const schema = datasetSchema.parse(version.rows[0].schema_definition);
         prepared.push({
           route,
-          schema: datasetSchema.parse(version.rows[0].schema_definition),
+          schema,
+          fieldsById: new Map(
+            schema.sections
+              .flatMap((section) => section.fields)
+              .map((field) => [field.id, field]),
+          ),
         });
       }
       let imported = 0,
@@ -197,8 +232,12 @@ export class OperationalImportsController {
           continue;
         }
         const attributes: Record<string, unknown> = {};
-        for (const [source, target] of Object.entries(chosen.route.mapping))
-          attributes[target] = row.properties[source] ?? null;
+        for (const [source, target] of Object.entries(chosen.route.mapping)) {
+          const field = chosen.fieldsById.get(target);
+          if (!field)
+            throw new BadRequestException("El campo destino ya no existe.");
+          attributes[target] = importValue(row.properties[source], field);
+        }
         try {
           validateValues(chosen.schema, attributes);
         } catch (error) {
