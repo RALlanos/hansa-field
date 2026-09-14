@@ -201,13 +201,15 @@ function appendFields(
   const sourceFields = definition.fields.map((field) => {
     const existing = byKey.get(field.key);
     return existing
-      ? { ...existing, label: field.label }
+      ? { ...existing, label: field.label, required: false }
       : { id: randomUUID(), ...field, required: false };
   });
   const definedKeys = new Set(definition.fields.map((field) => field.key));
   const retained = schema.sections.map((section) => ({
     ...section,
-    fields: section.fields.filter((field) => !definedKeys.has(field.key)),
+    fields: section.fields
+      .filter((field) => !definedKeys.has(field.key))
+      .map((field) => ({ ...field, required: false })),
   }));
   const sourceSection = retained.find(
     (section) => section.title === "Datos del archivo importado",
@@ -297,7 +299,8 @@ try {
     }>(
       `SELECT a.id app_id,t.id template_id,d.id dataset_id,tv.schema_definition template_schema,dv.schema_definition dataset_schema,
         tv.version template_version,dv.version dataset_version
-       FROM apps a JOIN template_versions tv ON tv.id=a.template_version_id JOIN templates t ON t.id=tv.template_id
+       FROM apps a JOIN template_versions selected_tv ON selected_tv.id=a.template_version_id JOIN templates t ON t.id=selected_tv.template_id
+       JOIN LATERAL(SELECT * FROM template_versions WHERE template_id=t.id ORDER BY version DESC LIMIT 1)tv ON true
        JOIN datasets d ON d.app_id=a.id
        JOIN LATERAL(SELECT * FROM dataset_versions WHERE dataset_id=d.id ORDER BY version DESC LIMIT 1)dv ON true
        WHERE a.organization_id=$1 AND a.name=$2 FOR UPDATE OF a,t,d`,

@@ -50,7 +50,7 @@ function importValue(value: unknown, field: DatasetField): unknown {
     if (typeof value === "number") return value;
     if (typeof value === "string") {
       const parsed = Number(value.trim().replace(",", "."));
-      return Number.isFinite(parsed) ? parsed : value;
+      return Number.isFinite(parsed) ? parsed : null;
     }
     return value;
   }
@@ -65,6 +65,13 @@ function importValue(value: unknown, field: DatasetField): unknown {
   }
   if (field.type === "date" && value instanceof Date)
     return value.toISOString().slice(0, 10);
+  if (field.type === "singleChoice" && typeof value === "string") {
+    const normalized = value.trim().toLocaleLowerCase();
+    const matchingOption = field.options?.find(
+      (option) => option.toLocaleLowerCase() === normalized,
+    );
+    return matchingOption ?? value;
+  }
   return typeof value === "string" ? value : String(value);
 }
 
