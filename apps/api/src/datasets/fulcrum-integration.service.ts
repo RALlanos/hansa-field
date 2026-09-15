@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   BadRequestException,
   Injectable,
@@ -7,6 +7,11 @@ import {
 import { z } from "zod";
 
 import { DatabaseService } from "../database/database.service.js";
+import {
+  geometrySchema,
+  type GeoJsonGeometry,
+} from "../records/record-input.js";
+import { DatasetRecordsService } from "./dataset-records.service.js";
 import { templateInput } from "./template-contract.js";
 const LOCAL_ORGANIZATION = "00000000-0000-4000-8000-000000000001";
 
@@ -43,6 +48,7 @@ const cloneInput = z
   .object({
     formId: z.string().uuid(),
     strategy: z.enum(["preserve", "sections", "fieldValues"]),
+    recordsMode: z.enum(["structure", "records"]).default("structure"),
     splitFieldKey: z.string().min(1).max(128).optional(),
     projectId: z.string().uuid().optional(),
     projectName: z.string().trim().min(1).max(160).optional(),
@@ -55,6 +61,13 @@ const cloneInput = z
         path: ["splitFieldKey"],
         message: "Selecciona el campo para separar.",
       });
+    if (input.strategy === "sections" && input.recordsMode === "records")
+      ctx.addIssue({
+        code: "custom",
+        path: ["recordsMode"],
+        message:
+          "La separación por secciones solo crea estructura; no puede decidir de forma segura a qué sección pertenece cada registro.",
+      });
     if (input.projectId && input.projectName)
       ctx.addIssue({
         code: "custom",
@@ -62,6 +75,16 @@ const cloneInput = z
         message: "Elige un proyecto existente o escribe uno nuevo, no ambos.",
       });
   });
+
+type CloneTarget = {
+  readonly identity: string;
+  readonly datasetId: string;
+  readonly projectId: string | null;
+  readonly projectAppId: string | null;
+  readonly schema: ReturnType<typeof buildSchema>;
+  readonly sourceFields: readonly SourceElement[];
+  readonly routing: { fieldKey: string; value: string } | null;
+};
 
 const temporaryToken = z
   .string()
@@ -96,6 +119,10 @@ function stableUuid(value: string): string {
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function fieldId(formId: string, identity: string, sourceKey: string): string {
+  return stableUuid(`fulcrum:${formId}:${identity}:field:${sourceKey}`);
 }
 
 function safeKey(value: string, fallback: string): string {
@@ -197,6 +224,58 @@ function allFields(form: SourceForm): SourceElement[] {
   return [...(form.status ? [form.status] : []), ...flatten(form.elements)];
 }
 
+function formValue(value: unknown, field: SourceElement): unknown {
+  if (value === null || value === undefined || value === "") return null;
+  const object = asRecord(value);
+  const choiceValues = Array.isArray(object.choice_values)
+    ? object.choice_values.filter(
+        (choice): choice is string => typeof choice === "string",
+      )
+    : null;
+  if (choiceValues)
+    return field.multiple ? choiceValues : (choiceValues[0] ?? null);
+  if (field.type === "YesNoField") {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["yes", "true", "1", "si", "sí"].includes(normalized)) return true;
+      if (["no", "false", "0"].includes(normalized)) return false;
+    }
+    return null;
+  }
+  if (field.type === "TextField" && field.numeric) {
+    const number = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+  if (typeof value === "string") return value;
+  const accessKey = stringValue(object.access_key);
+  if (accessKey) return accessKey;
+  return JSON.stringify(value);
+}
+
+function recordGeometry(
+  record: Readonly<Record<string, unknown>>,
+): GeoJsonGeometry | null {
+  const candidates = [
+    record.geometry,
+    asRecord(record.gps_device_capture).geometry,
+  ];
+  for (const candidate of candidates) {
+    const parsed = geometrySchema.safeParse(candidate);
+    if (parsed.success) return parsed.data;
+  }
+  const latitude = record.latitude;
+  const longitude = record.longitude;
+  if (
+    typeof latitude === "number" &&
+    Number.isFinite(latitude) &&
+    typeof longitude === "number" &&
+    Number.isFinite(longitude)
+  )
+    return { type: "Point", coordinates: [longitude, latitude] };
+  return null;
+}
+
 function buildSchema(
   form: SourceForm,
   identity: string,
@@ -220,7 +299,7 @@ function buildSchema(
       ...new Set(element.choices.map((choice) => choice.value)),
     ].slice(0, 100);
     const field = {
-      id: stableUuid(`fulcrum:${form.id}:${identity}:field:${element.key}`),
+      id: fieldId(form.id, identity, element.key),
       key,
       label: element.label,
       type: (options.length ||
@@ -417,6 +496,140 @@ export class FulcrumIntegrationService {
     };
   }
 
+  private async records(formId: string, requestToken?: string) {
+    const records: unknown[] = [];
+    const perPage = 1_000;
+    const maximum = 10_000;
+    for (let page = 1; records.length < maximum; page += 1) {
+      const body = asRecord(
+        await this.get(
+          `/records.json?form_id=${encodeURIComponent(formId)}&per_page=${perPage}&page=${page}`,
+          requestToken,
+        ),
+      );
+      const pageRecords = Array.isArray(body.records) ? body.records : [];
+      records.push(...pageRecords);
+      if (pageRecords.length < perPage) return records;
+    }
+    throw new BadRequestException(
+      "Esta importación tiene más de 10.000 registros. Usa primero la estructura y luego una importación masiva por lotes.",
+    );
+  }
+
+  private async importRecords(
+    form: SourceForm,
+    targets: readonly CloneTarget[],
+    sourceRecords: readonly unknown[],
+  ) {
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+    const issues: string[] = [];
+    const writer = new DatasetRecordsService(this.database);
+    for (const [index, raw] of sourceRecords.entries()) {
+      const record = asRecord(raw);
+      const externalId = stringValue(record.id);
+      if (!externalId) {
+        skipped += 1;
+        issues.push(
+          `Registro ${index + 1}: Fulcrum no devolvió identificador.`,
+        );
+        continue;
+      }
+      const values = asRecord(record.form_values);
+      for (const target of targets) {
+        const routeValue = target.routing
+          ? target.routing.fieldKey === form.status?.key
+            ? record.status
+            : values[target.routing.fieldKey]
+          : undefined;
+        const matchesRoute =
+          !target.routing ||
+          formValue(
+            routeValue,
+            allFields(form).find(
+              (field) => field.key === target.routing?.fieldKey,
+            ) ?? target.sourceFields[0]!,
+          ) === target.routing.value;
+        if (!matchesRoute) continue;
+        const attributes: Record<string, unknown> = {};
+        for (const source of target.sourceFields) {
+          const rawValue =
+            source.key === form.status?.key
+              ? record.status
+              : values[source.key];
+          attributes[fieldId(form.id, target.identity, source.key)] = formValue(
+            rawValue,
+            source,
+          );
+        }
+        try {
+          const existing = await this.database.query<{
+            id: string;
+            revision: number;
+          }>(
+            `SELECT id,revision FROM records
+             WHERE organization_id=$1 AND dataset_id=$2
+             AND origin->'importSource'->>'provider'='fulcrum'
+             AND origin->'importSource'->>'formId'=$3
+             AND origin->'importSource'->>'externalId'=$4
+             LIMIT 1`,
+            [LOCAL_ORGANIZATION, target.datasetId, form.id, externalId],
+          );
+          const geometry = recordGeometry(record);
+          if (existing.rows[0]) {
+            await writer.patchBaseline(
+              {
+                organizationId: LOCAL_ORGANIZATION,
+                actorId: "fulcrum-import",
+                operationId: randomUUID(),
+              },
+              existing.rows[0].id,
+              {
+                expectedRevision: existing.rows[0].revision,
+                attributes,
+                geometry,
+              },
+            );
+            updated += 1;
+          } else {
+            await writer.create(
+              {
+                organizationId: LOCAL_ORGANIZATION,
+                actorId: "fulcrum-import",
+                operationId: randomUUID(),
+              },
+              {
+                datasetId: target.datasetId,
+                ...(target.projectId ? { projectId: target.projectId } : {}),
+                ...(target.projectAppId
+                  ? { projectAppId: target.projectAppId }
+                  : {}),
+                attributes,
+                geometry,
+                importSource: {
+                  jobId: `fulcrum:${form.id}`,
+                  filename: `Fulcrum · ${form.name}`,
+                  externalId,
+                  provider: "fulcrum",
+                  formId: form.id,
+                },
+              },
+            );
+            imported += 1;
+          }
+        } catch (error: unknown) {
+          skipped += 1;
+          if (issues.length < 100)
+            issues.push(
+              `Registro ${index + 1}: ${error instanceof Error ? error.message : "no se pudo importar"}`,
+            );
+        }
+      }
+    }
+    return { imported, updated, skipped, issues };
+  }
+
   async clone(raw: unknown, requestToken?: string) {
     const input = cloneInput.parse(raw);
     const form = parseForm(
@@ -470,7 +683,11 @@ export class FulcrumIntegrationService {
       throw new BadRequestException(
         "La estrategia elegida no produjo Apps. Revisa la configuración del formulario origen.",
       );
-    return this.database.withTransaction(async (tx) => {
+    const sourceRecords =
+      input.recordsMode === "records"
+        ? await this.records(form.id, requestToken)
+        : [];
+    const structure = await this.database.withTransaction(async (tx) => {
       let projectId = input.projectId;
       if (input.projectName) {
         const project = await tx.query<{ id: string }>(
@@ -488,6 +705,7 @@ export class FulcrumIntegrationService {
           throw new BadRequestException("Proyecto destino inexistente.");
       }
       const apps: { id: string; name: string; created: boolean }[] = [];
+      const targets: CloneTarget[] = [];
       for (const output of outputs) {
         const schema = buildSchema(
           form,
@@ -546,16 +764,18 @@ export class FulcrumIntegrationService {
             created: true,
           });
         }
+        let projectAppId: string | null = null;
         if (projectId) {
           const membership = await tx.query<{ id: string }>(
             "INSERT INTO project_apps(organization_id,project_id,app_id,dataset_id) VALUES($1,$2,$3,$4) ON CONFLICT(project_id,app_id) DO NOTHING RETURNING id",
             [LOCAL_ORGANIZATION, projectId, appId, datasetId],
           );
-          if (membership.rows[0])
+          projectAppId = membership.rows[0]?.id ?? null;
+          if (projectAppId)
             await tx.query(
               "INSERT INTO project_app_versions(project_app_id,version,schema_definition,settings) VALUES($1,1,$2,$3)",
               [
-                membership.rows[0].id,
+                projectAppId,
                 schema,
                 {
                   symbol: {
@@ -566,15 +786,45 @@ export class FulcrumIntegrationService {
                 },
               ],
             );
+          if (!projectAppId) {
+            const existingMembership = await tx.query<{ id: string }>(
+              "SELECT id FROM project_apps WHERE organization_id=$1 AND project_id=$2 AND app_id=$3 AND dataset_id=$4",
+              [LOCAL_ORGANIZATION, projectId, appId, datasetId],
+            );
+            projectAppId = existingMembership.rows[0]?.id ?? null;
+          }
         }
+        targets.push({
+          identity: output.identity,
+          datasetId,
+          projectId: projectId ?? null,
+          projectAppId,
+          schema,
+          sourceFields: output.fields,
+          routing: output.routing,
+        });
       }
       return {
         source: { id: form.id, name: form.name },
         strategy: input.strategy,
         projectId: projectId ?? null,
         apps,
-        recordsImported: 0,
+        targets,
       };
     });
+    const records =
+      input.recordsMode === "records"
+        ? await this.importRecords(form, structure.targets, sourceRecords)
+        : { imported: 0, updated: 0, skipped: 0, issues: [] };
+    return {
+      source: structure.source,
+      strategy: structure.strategy,
+      projectId: structure.projectId,
+      apps: structure.apps,
+      recordsImported: records.imported,
+      recordsUpdated: records.updated,
+      recordsSkipped: records.skipped,
+      issues: records.issues,
+    };
   }
 }

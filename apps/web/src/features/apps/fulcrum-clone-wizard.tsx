@@ -62,6 +62,9 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
   const [strategy, setStrategy] = useState<
     "preserve" | "sections" | "fieldValues"
   >("preserve");
+  const [recordsMode, setRecordsMode] = useState<"structure" | "records">(
+    "structure",
+  );
   const [splitFieldKey, setSplitFieldKey] = useState("");
   const [projectMode, setProjectMode] = useState<"none" | "existing" | "new">(
     "none",
@@ -73,6 +76,7 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [importIssues, setImportIssues] = useState<string[]>([]);
 
   const loadForms = useCallback(async (token: string) => {
     setLoading(true);
@@ -143,20 +147,29 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
     if (!canSubmit || !preview) return;
     setSubmitting(true);
     setMessage("");
+    setImportIssues([]);
     try {
       const result = await fulcrumRequest<{
         apps: { id: string; name: string; created: boolean }[];
         projectId: string | null;
+        recordsImported: number;
+        recordsUpdated: number;
+        recordsSkipped: number;
+        issues: string[];
       }>("/fulcrum/clone", activeToken, {
         formId: preview.id,
         strategy,
+        recordsMode,
         ...(strategy === "fieldValues" ? { splitFieldKey } : {}),
         ...(projectMode === "existing" ? { projectId } : {}),
         ...(projectMode === "new" ? { projectName: projectName.trim() } : {}),
       });
       await onComplete();
+      setImportIssues(result.issues);
       setMessage(
-        `${result.apps.length} App(s) ${result.apps.every((app) => !app.created) ? "ya existían" : "creada(s)"}${result.projectId ? " y vinculada(s) al Proyecto" : ""}. No se importaron registros.`,
+        recordsMode === "records"
+          ? `${result.apps.length} App(s) preparadas. Registros: ${result.recordsImported} nuevos, ${result.recordsUpdated} actualizados y ${result.recordsSkipped} omitidos.${result.issues.length ? " Revisa las incidencias mostradas." : ""}`
+          : `${result.apps.length} App(s) ${result.apps.every((app) => !app.created) ? "ya existían" : "creada(s)"}${result.projectId ? " y vinculada(s) al Proyecto" : ""}. No se importaron registros.`,
       );
     } catch (reason: unknown) {
       setMessage(
@@ -307,6 +320,49 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
 
             <fieldset className="space-y-2">
               <legend className="text-xs font-semibold text-slate-800">
+                Qué traer desde Fulcrum
+              </legend>
+              <label className="flex gap-2 p-3 border rounded cursor-pointer">
+                <input
+                  type="radio"
+                  checked={recordsMode === "structure"}
+                  onChange={() => setRecordsMode("structure")}
+                />
+                <span>
+                  <b className="block text-xs">Solo estructura</b>
+                  <small className="text-slate-500">
+                    Crea Plantilla, App y Dataset vacíos.
+                  </small>
+                </span>
+              </label>
+              <label
+                className={`flex gap-2 p-3 border rounded ${strategy === "sections" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                <input
+                  type="radio"
+                  checked={recordsMode === "records"}
+                  disabled={strategy === "sections"}
+                  onChange={() => setRecordsMode("records")}
+                />
+                <span>
+                  <b className="block text-xs">Estructura y registros</b>
+                  <small className="text-slate-500">
+                    Trae atributos, Estado y geometrías. Al repetir, actualiza
+                    registros ya importados desde esa App de Fulcrum.
+                  </small>
+                </span>
+              </label>
+              {strategy === "sections" && (
+                <p className="text-[11px] text-amber-700">
+                  Una separación por secciones no identifica de forma segura el
+                  destino de cada registro. Para traer datos usa la App completa
+                  o separar por valores de un campo.
+                </p>
+              )}
+            </fieldset>
+
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold text-slate-800">
                 Cómo crear la estructura
               </legend>
               <label className="flex gap-2 p-3 border rounded cursor-pointer">
@@ -345,7 +401,10 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
                 <input
                   type="radio"
                   checked={strategy === "sections"}
-                  onChange={() => setStrategy("sections")}
+                  onChange={() => {
+                    setStrategy("sections");
+                    setRecordsMode("structure");
+                  }}
                 />
                 <span>
                   <b className="block text-xs">Crear una App por sección</b>
@@ -465,6 +524,23 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
           >
             {message}
           </p>
+        )}
+        {importIssues.length > 0 && (
+          <div className="p-3 text-xs border border-amber-200 bg-amber-50 rounded">
+            <b className="block text-amber-900 mb-1">
+              Incidencias de importación
+            </b>
+            <ul className="list-disc pl-4 space-y-1 text-amber-800">
+              {importIssues.slice(0, 10).map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+            {importIssues.length > 10 && (
+              <p className="mt-1 text-amber-800">
+                Se ocultaron {importIssues.length - 10} incidencias adicionales.
+              </p>
+            )}
+          </div>
         )}
       </div>
     </section>

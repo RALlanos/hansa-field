@@ -29,7 +29,13 @@ type CreateInput = {
   projectAppId?: string;
   attributes: Record<string, unknown>;
   geometry: GeoJsonGeometry | null;
-  importSource?: { jobId: string; filename: string; externalId: string | null };
+  importSource?: {
+    jobId: string;
+    filename: string;
+    externalId: string | null;
+    provider?: string;
+    formId?: string;
+  };
 };
 type PatchInput = {
   expectedRevision: number;
