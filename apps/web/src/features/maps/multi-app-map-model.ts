@@ -20,7 +20,7 @@ export function buildMapRecordsUrl(
     mode: scope.mode,
     bbox: scope.bbox.map((value) => Number(value.toFixed(5))).join(","),
     zoom: String(Math.round(scope.zoom)),
-    budget: String(scope.budget ?? 8000),
+    budget: String(scope.budget ?? 4000),
   });
   if (scope.appIds?.length) parameters.set("appIds", scope.appIds.join(","));
   if (scope.projectIds?.length)
