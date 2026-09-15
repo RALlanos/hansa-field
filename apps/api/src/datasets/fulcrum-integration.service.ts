@@ -63,6 +63,13 @@ const cloneInput = z
       });
   });
 
+const temporaryToken = z
+  .string()
+  .trim()
+  .min(24)
+  .max(512)
+  .regex(/^[A-Za-z0-9._-]+$/, "El token temporal de Fulcrum no es válido.");
+
 function asRecord(value: unknown): Readonly<Record<string, unknown>> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Readonly<Record<string, unknown>>)
@@ -325,8 +332,10 @@ function buildSchema(
 export class FulcrumIntegrationService {
   constructor(private readonly database: DatabaseService) {}
 
-  private token() {
-    const token = process.env.FULCRUM_API_TOKEN?.trim();
+  private token(requestToken?: string) {
+    const token = requestToken
+      ? temporaryToken.parse(requestToken)
+      : process.env.FULCRUM_API_TOKEN?.trim();
     if (!token)
       throw new ServiceUnavailableException(
         "Fulcrum no está configurado en el servidor. Define FULCRUM_API_TOKEN solo en el entorno de API.",
@@ -334,21 +343,33 @@ export class FulcrumIntegrationService {
     return token;
   }
 
-  private async get(path: string): Promise<unknown> {
+  private async get(path: string, requestToken?: string): Promise<unknown> {
     const base = (
       process.env.FULCRUM_API_URL ?? "https://api.fulcrumapp.com/api/v2"
     ).replace(/\/$/, "");
     const response = await fetch(`${base}${path}`, {
-      headers: { Accept: "application/json", "X-ApiToken": this.token() },
+      headers: {
+        Accept: "application/json",
+        "X-ApiToken": this.token(requestToken),
+      },
     });
-    const body: unknown = await response.json();
+    const text = await response.text();
     if (!response.ok)
       throw new BadRequestException(`Fulcrum respondió ${response.status}.`);
-    return body;
+    if (!text) return {};
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new BadRequestException(
+        "Fulcrum devolvió una respuesta que no es JSON.",
+      );
+    }
   }
 
-  async forms() {
-    const body = asRecord(await this.get("/forms.json?per_page=200"));
+  async forms(requestToken?: string) {
+    const body = asRecord(
+      await this.get("/forms.json?per_page=200", requestToken),
+    );
     return (Array.isArray(body.forms) ? body.forms : []).flatMap((form) => {
       const source = asRecord(form);
       const id = stringValue(source.id);
@@ -368,9 +389,9 @@ export class FulcrumIntegrationService {
     });
   }
 
-  async preview(formId: string) {
+  async preview(formId: string, requestToken?: string) {
     const form = parseForm(
-      await this.get(`/forms/${encodeURIComponent(formId)}.json`),
+      await this.get(`/forms/${encodeURIComponent(formId)}.json`, requestToken),
     );
     return {
       id: form.id,
@@ -396,10 +417,13 @@ export class FulcrumIntegrationService {
     };
   }
 
-  async clone(raw: unknown) {
+  async clone(raw: unknown, requestToken?: string) {
     const input = cloneInput.parse(raw);
     const form = parseForm(
-      await this.get(`/forms/${encodeURIComponent(input.formId)}.json`),
+      await this.get(
+        `/forms/${encodeURIComponent(input.formId)}.json`,
+        requestToken,
+      ),
     );
     const fields = allFields(form);
     const outputs =

@@ -124,16 +124,22 @@ export class OperationalController {
       blocks: blocks.rows,
     };
   }
-  @Get("fulcrum/forms") formsFromFulcrum() {
-    return this.fulcrum.forms();
+  @Get("fulcrum/forms") formsFromFulcrum(
+    @Headers("x-fulcrum-token") temporaryToken?: string,
+  ) {
+    return this.fulcrum.forms(temporaryToken);
   }
   @Get("fulcrum/forms/:formId") previewFulcrumForm(
     @Param("formId") formId: string,
+    @Headers("x-fulcrum-token") temporaryToken?: string,
   ) {
-    return this.fulcrum.preview(uuid.parse(formId));
+    return this.fulcrum.preview(uuid.parse(formId), temporaryToken);
   }
-  @Post("fulcrum/clone") cloneFromFulcrum(@Body() body: unknown) {
-    return this.fulcrum.clone(body);
+  @Post("fulcrum/clone") cloneFromFulcrum(
+    @Body() body: unknown,
+    @Headers("x-fulcrum-token") temporaryToken?: string,
+  ) {
+    return this.fulcrum.clone(body, temporaryToken);
   }
   @Post("apps") app(@Body() body: unknown) {
     const input = z

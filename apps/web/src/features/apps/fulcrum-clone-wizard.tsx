@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getApiBase } from "../../lib/api-base";
-import { api, type Catalog } from "../operational/contracts";
+import type { Catalog } from "../operational/contracts";
 
 type SourceForm = { id: string; name: string; recordCount: number | null };
 type Choice = { value: string; label: string; color: string | null };
@@ -31,6 +31,30 @@ type Props = Readonly<{
   onClose: () => void;
 }>;
 
+async function fulcrumRequest<T>(
+  path: string,
+  temporaryToken: string,
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${getApiBase()}/api/workspace${path}`, {
+    ...(body === undefined
+      ? {}
+      : { method: "POST", body: JSON.stringify(body) }),
+    headers: {
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(temporaryToken ? { "x-fulcrum-token": temporaryToken } : {}),
+    },
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok)
+    throw new Error(
+      typeof payload === "object" && payload !== null && "message" in payload
+        ? String(payload.message)
+        : "No se pudo conectar con Fulcrum.",
+    );
+  return payload as T;
+}
+
 export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
   const [forms, setForms] = useState<SourceForm[]>([]);
   const [formId, setFormId] = useState("");
@@ -44,41 +68,35 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
   );
   const [projectId, setProjectId] = useState("");
   const [projectName, setProjectName] = useState("");
+  const [temporaryToken, setTemporaryToken] = useState("");
+  const [activeToken, setActiveToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    let active = true;
-    fetch(`${getApiBase()}/api/workspace/fulcrum/forms`)
-      .then(async (response) => {
-        const body: unknown = await response.json();
-        if (!response.ok)
-          throw new Error(
-            typeof body === "object" && body !== null && "message" in body
-              ? String(body.message)
-              : "No se pudo conectar con Fulcrum.",
-          );
-        return body as SourceForm[];
-      })
-      .then((items) => {
-        if (active) setForms(items);
-      })
-      .catch((reason: unknown) => {
-        if (active)
-          setMessage(
-            reason instanceof Error
-              ? reason.message
-              : "No se pudo conectar con Fulcrum.",
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+  const loadForms = useCallback(async (token: string) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const items = await fulcrumRequest<SourceForm[]>("/fulcrum/forms", token);
+      setForms(items);
+      return true;
+    } catch (reason: unknown) {
+      setForms([]);
+      setMessage(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo conectar con Fulcrum.",
+      );
+      return false;
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadForms("");
+  }, [loadForms]);
 
   useEffect(() => {
     if (!formId) {
@@ -88,17 +106,7 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
     let active = true;
     setPreview(null);
     setMessage("");
-    fetch(`${getApiBase()}/api/workspace/fulcrum/forms/${formId}`)
-      .then(async (response) => {
-        const body: unknown = await response.json();
-        if (!response.ok)
-          throw new Error(
-            typeof body === "object" && body !== null && "message" in body
-              ? String(body.message)
-              : "No se pudo inspeccionar la App.",
-          );
-        return body as Preview;
-      })
+    fulcrumRequest<Preview>(`/fulcrum/forms/${formId}`, activeToken)
       .then((data) => {
         if (!active) return;
         setPreview(data);
@@ -115,7 +123,7 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
     return () => {
       active = false;
     };
-  }, [formId]);
+  }, [activeToken, formId]);
 
   const splitCandidates = useMemo(
     () => preview?.fields.filter((field) => field.choices.length > 0) ?? [],
@@ -136,10 +144,10 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
     setSubmitting(true);
     setMessage("");
     try {
-      const result = await api<{
+      const result = await fulcrumRequest<{
         apps: { id: string; name: string; created: boolean }[];
         projectId: string | null;
-      }>("/fulcrum/clone", {
+      }>("/fulcrum/clone", activeToken, {
         formId: preview.id,
         strategy,
         ...(strategy === "fieldValues" ? { splitFieldKey } : {}),
@@ -191,6 +199,42 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
         </button>
       </header>
       <div className="p-5 space-y-5">
+        <div className="p-3 border border-slate-200 rounded bg-slate-50 space-y-2">
+          <label className="block text-xs font-medium text-slate-700 space-y-1">
+            <span>Token temporal de Fulcrum</span>
+            <input
+              type="password"
+              value={temporaryToken}
+              onChange={(event) => setTemporaryToken(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Pega aquí tu token de Fulcrum"
+              className="w-full max-w-xl px-3 py-2 bg-white border border-slate-300 rounded"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={!temporaryToken.trim() || loading}
+              onClick={() => {
+                const token = temporaryToken.trim();
+                void loadForms(token).then((connected) => {
+                  if (!connected) return;
+                  setActiveToken(token);
+                  setFormId("");
+                  setPreview(null);
+                  setMessage("Fulcrum conectado para esta sesión.");
+                });
+              }}
+              className="px-3 py-2 text-xs font-semibold text-white bg-sky-600 disabled:opacity-50 rounded"
+            >
+              Conectar Fulcrum
+            </button>
+            <p className="text-[11px] text-slate-500">
+              Se usa solo en memoria para esta ventana y no se guarda en Hansa.
+            </p>
+          </div>
+        </div>
         {loading ? (
           <p className="text-xs text-slate-500">
             Consultando Apps disponibles…
