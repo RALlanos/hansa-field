@@ -42,6 +42,11 @@ type ClusterRow = {
   dataset_name: string;
 };
 
+type ScopeCountRow = {
+  total: number;
+  point_total: number;
+};
+
 type SettingsRow = { project_app_id: string; settings: unknown };
 type DatasetStyleRow = { dataset_id: string; schema_definition: unknown };
 type ValueStyle = {
@@ -146,16 +151,53 @@ export class MapRecordsService {
       scope.filters ?? [],
       scope.segmentIds ?? [],
     );
-    const countParams = [...base.params, ...filterParams];
-    const count = await this.database.query<{ total: number }>(
-      `${base.visible} SELECT count(*)::integer total FROM visible WHERE ${where || "true"}`,
-      countParams,
+    const count = await this.database.query<ScopeCountRow>(
+      `${base.visible} SELECT count(*)::integer total,
+       count(*) FILTER (WHERE ST_GeometryType(geometry) = 'ST_Point')::integer point_total
+       FROM visible WHERE ${where || "true"}`,
+      [...base.params, ...filterParams],
     );
     const totalRecords = count.rows[0]?.total ?? 0;
-    if (totalRecords <= scope.budget) {
-      return this.features(organizationId, base, where, filterParams, scope);
-    }
-    return this.clusters(organizationId, base, where, filterParams, scope);
+    const pointTotal = count.rows[0]?.point_total ?? 0;
+    const pointsClustered = pointTotal > scope.budget;
+    const pointFeatures = pointsClustered
+      ? await this.pointClusters(
+          organizationId,
+          base,
+          where,
+          filterParams,
+          scope,
+        )
+      : await this.geometryFeatures(
+          base,
+          where,
+          filterParams,
+          "ST_GeometryType(geometry) = 'ST_Point'",
+          scope.budget,
+        );
+    const linearFeatures = await this.geometryFeatures(
+      base,
+      where,
+      filterParams,
+      "ST_GeometryType(geometry) IN ('ST_LineString', 'ST_Polygon')",
+      scope.budget,
+    );
+    const rawFeatures = [...pointFeatures.rows, ...linearFeatures.rows];
+    const overrides = await this.loadOverrides(organizationId, [
+      ...new Set(rawFeatures.map((row) => row.project_app_id).filter(Boolean)),
+    ] as string[]);
+    const styles = await this.loadDatasetStyles(organizationId, [
+      ...new Set(rawFeatures.map((row) => row.dataset_id)),
+    ]);
+    return {
+      data: [
+        ...pointFeatures.clusters,
+        ...rawFeatures.map((row) => this.toFeature(row, overrides, styles, 1)),
+      ],
+      clustered: pointsClustered,
+      totalRecords,
+      truncated: pointFeatures.truncated || linearFeatures.truncated,
+    };
   }
 
   async table(
@@ -209,36 +251,33 @@ export class MapRecordsService {
     };
   }
 
-  private async features(
-    organizationId: string,
+  private async geometryFeatures(
     base: { visible: string; params: unknown[] },
     where: string,
     filterParams: unknown[],
-    scope: MapScope,
-  ): Promise<MapFeatureResult> {
-    const limit = scope.budget + 1;
+    geometryPredicate: string,
+    budget: number,
+  ): Promise<{
+    rows: VisibleRow[];
+    clusters: MapFeatureDto[];
+    truncated: boolean;
+  }> {
+    const limit = budget + 1;
     const limitParam = 9 + filterParams.length;
     const result = await this.database.query<VisibleRow>(
       `${base.visible}, filtered AS (SELECT * FROM visible WHERE ${where || "true"})
-       SELECT *, ST_AsGeoJSON(geometry)::jsonb geometry FROM filtered ORDER BY dataset_id,record_uuid LIMIT $${limitParam}`,
+       SELECT *, ST_AsGeoJSON(geometry)::jsonb geometry FROM filtered
+       WHERE ${geometryPredicate} ORDER BY dataset_id,record_uuid LIMIT $${limitParam}`,
       [...base.params, ...filterParams, limit],
     );
-    const overrides = await this.loadOverrides(organizationId, [
-      ...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean)),
-    ] as string[]);
-    const styles = await this.loadDatasetStyles(organizationId, [
-      ...new Set(result.rows.map((row) => row.dataset_id)),
-    ]);
-    const rows = result.rows.slice(0, scope.budget);
     return {
-      data: rows.map((row) => this.toFeature(row, overrides, styles, 1)),
-      clustered: false,
-      totalRecords: await this.scopeCount(base, where, filterParams),
-      truncated: result.rows.length > scope.budget,
+      rows: result.rows.slice(0, budget),
+      clusters: [],
+      truncated: result.rows.length > budget,
     };
   }
 
-  private async clusters(
+  private async pointClusters(
     organizationId: string,
     base: {
       visible: string;
@@ -248,18 +287,25 @@ export class MapRecordsService {
     where: string,
     filterParams: unknown[],
     scope: MapScope,
-  ): Promise<MapFeatureResult> {
+  ): Promise<{
+    rows: VisibleRow[];
+    clusters: MapFeatureDto[];
+    truncated: boolean;
+  }> {
     const cellWidth = Math.max((base.bbox[2] - base.bbox[0]) / 24, 0.00000001);
     const cellHeight = Math.max((base.bbox[3] - base.bbox[1]) / 24, 0.00000001);
     const cellWidthParam = 9 + filterParams.length;
     const cellHeightParam = cellWidthParam + 1;
     const budgetParam = cellHeightParam + 1;
     const result = await this.database.query<ClusterRow>(
-      `${base.visible}, filtered AS (SELECT * FROM visible WHERE ${where || "true"}), points AS (
-        SELECT floor((ST_X(ST_PointOnSurface(geometry))-$5)/$${cellWidthParam}) gx,
-               floor((ST_Y(ST_PointOnSurface(geometry))-$6)/$${cellHeightParam}) gy,
+      `${base.visible}, filtered AS (
+        SELECT * FROM visible WHERE (${where || "true"})
+          AND ST_GeometryType(geometry) = 'ST_Point'
+      ), points AS (
+        SELECT floor((ST_X(geometry)-$5)/$${cellWidthParam}) gx,
+               floor((ST_Y(geometry)-$6)/$${cellHeightParam}) gy,
                count(*)::integer count,
-               ST_AsGeoJSON(ST_Centroid(ST_Collect(ST_PointOnSurface(geometry))))::jsonb geometry,
+               ST_AsGeoJSON(ST_Centroid(ST_Collect(geometry)))::jsonb geometry,
                dataset_id, app_id,
                project_id, project_app_id,
                min(app_name) app_name, min(dataset_name) dataset_name
@@ -271,7 +317,8 @@ export class MapRecordsService {
       ...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean)),
     ] as string[]);
     return {
-      data: result.rows.map((row) => {
+      rows: [],
+      clusters: result.rows.map((row) => {
         const symbol = resolveSymbol(overrides, {
           projectAppId: row.project_app_id,
           appId: row.app_id,
@@ -294,8 +341,6 @@ export class MapRecordsService {
           isCluster: true,
         } satisfies MapFeatureDto;
       }),
-      clustered: true,
-      totalRecords: await this.scopeCount(base, where, filterParams),
       truncated: result.rows.length >= scope.budget,
     };
   }
