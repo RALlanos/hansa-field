@@ -38,7 +38,7 @@ export const mapScopeSchema = z
       z.coerce.number().min(-90).max(90),
     ]),
     zoom: z.coerce.number().int().min(0).max(24).default(12),
-    budget: z.coerce.number().int().min(10).max(10_000).default(4_000),
+    budget: z.coerce.number().int().min(10).max(10_000).default(2_500),
   })
   .strict();
 
@@ -79,6 +79,20 @@ export type MapFeatureResult = Readonly<{
   clustered: boolean;
   totalRecords: number;
   truncated: boolean;
+  rendering: MapRenderingSummary;
+}>;
+
+export type MapGeometryRendering = Readonly<{
+  total: number;
+  rendered: number;
+  truncated: boolean;
+  simplified: boolean;
+}>;
+
+export type MapRenderingSummary = Readonly<{
+  points: MapGeometryRendering & Readonly<{ clustered: boolean }>;
+  lines: MapGeometryRendering;
+  polygons: MapGeometryRendering;
 }>;
 
 export type MapTableRowDto = MapFeatureDto &

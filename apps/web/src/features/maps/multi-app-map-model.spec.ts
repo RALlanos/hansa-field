@@ -8,6 +8,7 @@ describe("buildMapRecordsUrl", () => {
       mode: "project",
       bbox: [-69.123_456_7, -23, -57, -9.123_456_7],
       zoom: 8.4,
+      budget: 4_000,
       appIds: ["app-one", "app-two"],
       projectIds: ["project-one"],
     });

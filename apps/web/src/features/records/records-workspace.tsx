@@ -14,6 +14,7 @@ import {
   workspaceScopeKey,
 } from "../../lib/incremental-workspace-sync";
 import { RecordMap } from "../operational/record-map";
+import type { MultiAppMapStatus } from "../maps/multi-app-map";
 import { RecordInspector } from "./record-inspector";
 import { RecordCreateModal } from "./record-create-modal";
 import {
@@ -113,6 +114,7 @@ export function RecordsWorkspace({
 
   const [selectedRow, setSelectedRow] = useState<Row | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [mapStatus, setMapStatus] = useState<MultiAppMapStatus | null>(null);
 
   // Available collections
   const uniqueCollections = catalog.collections.filter(
@@ -315,7 +317,11 @@ export function RecordsWorkspace({
 
           {/* Count Badge */}
           <span className="bg-slate-800 text-sky-400 border border-slate-700 px-2.5 py-0.5 rounded text-xs font-semibold shrink-0">
-            {page.total} registros
+            {(viewMode === "table"
+              ? page.total
+              : (mapStatus?.totalRecords ?? page.total)
+            ).toLocaleString("es-BO")}{" "}
+            registros
           </span>
         </div>
 
@@ -440,6 +446,7 @@ export function RecordsWorkspace({
                 segmentIds={segmentFilter ? [segmentFilter.id] : []}
                 refresh={refresh}
                 onBounds={handleBoundsChange}
+                onStatus={setMapStatus}
                 onSelect={(row) => {
                   setDatasetId(row.dataset_id);
                   setSelectedRow(row);
@@ -448,9 +455,41 @@ export function RecordsWorkspace({
             </div>
 
             {/* Compact Map Overlay Status */}
-            <div className="absolute top-2 left-2 z-10 bg-slate-900/80 backdrop-blur-xs text-white text-[11px] px-2.5 py-1 rounded shadow-md border border-slate-700 flex items-center gap-2">
+            <div
+              aria-live="polite"
+              className="absolute top-2 left-2 z-10 max-w-[calc(100%-1rem)] bg-slate-900/85 backdrop-blur-xs text-white text-[11px] px-2.5 py-1 rounded shadow-md border border-slate-700 flex flex-wrap items-center gap-x-2 gap-y-0.5"
+            >
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>Sincronizado con visor</span>
+              <span className="font-medium">
+                {mapStatus
+                  ? `${mapStatus.totalRecords.toLocaleString("es-BO")} en esta área`
+                  : "Consultando área"}
+              </span>
+              {mapStatus?.rendering.points.total ? (
+                <span className="text-slate-300">
+                  {mapStatus.rendering.points.clustered
+                    ? `${mapStatus.rendering.points.rendered} grupos de puntos`
+                    : `${mapStatus.rendering.points.rendered} puntos`}
+                </span>
+              ) : null}
+              {mapStatus?.rendering.lines.total ? (
+                <span className="text-slate-300">
+                  {`${mapStatus.rendering.lines.rendered}/${mapStatus.rendering.lines.total} líneas`}
+                  {mapStatus.rendering.lines.simplified
+                    ? " · simplificadas"
+                    : ""}
+                </span>
+              ) : null}
+              {mapStatus?.rendering.polygons.total ? (
+                <span className="text-slate-300">
+                  {`${mapStatus.rendering.polygons.rendered}/${mapStatus.rendering.polygons.total} polígonos`}
+                </span>
+              ) : null}
+              {mapStatus?.truncated ? (
+                <span className="text-amber-300">
+                  Acércate para ver el resto
+                </span>
+              ) : null}
               <button
                 onClick={() => {
                   setBbox("-180,-90,180,90");

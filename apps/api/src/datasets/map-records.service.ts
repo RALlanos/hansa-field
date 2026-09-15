@@ -45,6 +45,8 @@ type ClusterRow = {
 type ScopeCountRow = {
   total: number;
   point_total: number;
+  line_total: number;
+  polygon_total: number;
 };
 
 type SettingsRow = { project_app_id: string; settings: unknown };
@@ -82,6 +84,16 @@ function stableColor(value: string): string {
 
 function stableIcon(value: string): string {
   return fallbackIcons[hashText(value) % fallbackIcons.length]!;
+}
+
+/** Degrees in EPSG:4326 used only for the visual copy sent at broad zooms. */
+function displaySimplificationTolerance(zoom: number): number {
+  if (zoom >= 16) return 0;
+  if (zoom >= 14) return 0.0001;
+  if (zoom >= 12) return 0.0004;
+  if (zoom >= 10) return 0.0015;
+  if (zoom >= 8) return 0.005;
+  return 0.02;
 }
 
 function resolveSymbol(
@@ -153,7 +165,9 @@ export class MapRecordsService {
     );
     const count = await this.database.query<ScopeCountRow>(
       `${base.visible} SELECT count(*)::integer total,
-       count(*) FILTER (WHERE ST_GeometryType(geometry) = 'ST_Point')::integer point_total
+       count(*) FILTER (WHERE ST_GeometryType(geometry) = 'ST_Point')::integer point_total,
+       count(*) FILTER (WHERE ST_GeometryType(geometry) = 'ST_LineString')::integer line_total,
+       count(*) FILTER (WHERE ST_GeometryType(geometry) = 'ST_Polygon')::integer polygon_total
        FROM visible WHERE ${where || "true"}`,
       [...base.params, ...filterParams],
     );
@@ -174,15 +188,28 @@ export class MapRecordsService {
           filterParams,
           "ST_GeometryType(geometry) = 'ST_Point'",
           scope.budget,
+          0,
         );
+    const simplificationTolerance = displaySimplificationTolerance(scope.zoom);
     const linearFeatures = await this.geometryFeatures(
       base,
       where,
       filterParams,
       "ST_GeometryType(geometry) IN ('ST_LineString', 'ST_Polygon')",
       scope.budget,
+      simplificationTolerance,
     );
     const rawFeatures = [...pointFeatures.rows, ...linearFeatures.rows];
+    const renderedLines = rawFeatures.filter(
+      (feature) => feature.geometry.type === "LineString",
+    ).length;
+    const renderedPolygons = rawFeatures.filter(
+      (feature) => feature.geometry.type === "Polygon",
+    ).length;
+    const renderedPoints =
+      pointFeatures.rows.length + pointFeatures.clusters.length;
+    const lineTotal = count.rows[0]?.line_total ?? 0;
+    const polygonTotal = count.rows[0]?.polygon_total ?? 0;
     const overrides = await this.loadOverrides(organizationId, [
       ...new Set(rawFeatures.map((row) => row.project_app_id).filter(Boolean)),
     ] as string[]);
@@ -197,6 +224,27 @@ export class MapRecordsService {
       clustered: pointsClustered,
       totalRecords,
       truncated: pointFeatures.truncated || linearFeatures.truncated,
+      rendering: {
+        points: {
+          total: pointTotal,
+          rendered: renderedPoints,
+          truncated: pointFeatures.truncated,
+          simplified: false,
+          clustered: pointsClustered,
+        },
+        lines: {
+          total: lineTotal,
+          rendered: renderedLines,
+          truncated: renderedLines < lineTotal,
+          simplified: simplificationTolerance > 0 && renderedLines > 0,
+        },
+        polygons: {
+          total: polygonTotal,
+          rendered: renderedPolygons,
+          truncated: renderedPolygons < polygonTotal,
+          simplified: simplificationTolerance > 0 && renderedPolygons > 0,
+        },
+      },
     };
   }
 
@@ -257,18 +305,29 @@ export class MapRecordsService {
     filterParams: unknown[],
     geometryPredicate: string,
     budget: number,
+    simplificationTolerance: number,
   ): Promise<{
     rows: VisibleRow[];
     clusters: MapFeatureDto[];
     truncated: boolean;
   }> {
     const limit = budget + 1;
-    const limitParam = 9 + filterParams.length;
+    const toleranceParam = 9 + filterParams.length;
+    const limitParam = toleranceParam + (simplificationTolerance > 0 ? 1 : 0);
+    const visualGeometry =
+      simplificationTolerance > 0
+        ? `ST_SimplifyPreserveTopology(geometry, $${toleranceParam})`
+        : "geometry";
     const result = await this.database.query<VisibleRow>(
       `${base.visible}, filtered AS (SELECT * FROM visible WHERE ${where || "true"})
-       SELECT *, ST_AsGeoJSON(geometry)::jsonb geometry FROM filtered
+       SELECT *, ST_AsGeoJSON(${visualGeometry})::jsonb geometry FROM filtered
        WHERE ${geometryPredicate} ORDER BY dataset_id,record_uuid LIMIT $${limitParam}`,
-      [...base.params, ...filterParams, limit],
+      [
+        ...base.params,
+        ...filterParams,
+        ...(simplificationTolerance > 0 ? [simplificationTolerance] : []),
+        limit,
+      ],
     );
     return {
       rows: result.rows.slice(0, budget),

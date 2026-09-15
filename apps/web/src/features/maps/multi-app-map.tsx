@@ -44,6 +44,20 @@ type MapResponse = Readonly<{
   clustered: boolean;
   totalRecords: number;
   truncated: boolean;
+  rendering?: MapRenderingSummary;
+}>;
+
+export type MapGeometryRendering = Readonly<{
+  total: number;
+  rendered: number;
+  truncated: boolean;
+  simplified: boolean;
+}>;
+
+export type MapRenderingSummary = Readonly<{
+  points: MapGeometryRendering & Readonly<{ clustered: boolean }>;
+  lines: MapGeometryRendering;
+  polygons: MapGeometryRendering;
 }>;
 
 export type MultiAppMapStatus = Readonly<{
@@ -51,7 +65,20 @@ export type MultiAppMapStatus = Readonly<{
   totalRecords: number;
   clustered: boolean;
   truncated: boolean;
+  rendering: MapRenderingSummary;
 }>;
+
+export const emptyMapRendering: MapRenderingSummary = {
+  points: {
+    total: 0,
+    rendered: 0,
+    truncated: false,
+    simplified: false,
+    clustered: false,
+  },
+  lines: { total: 0, rendered: 0, truncated: false, simplified: false },
+  polygons: { total: 0, rendered: 0, truncated: false, simplified: false },
+};
 
 type Props = Readonly<{
   mode?: MapMode;
@@ -70,7 +97,41 @@ const emptyStatus: MultiAppMapStatus = {
   totalRecords: 0,
   clustered: true,
   truncated: false,
+  rendering: emptyMapRendering,
 };
+
+function fallbackRendering(response: MapResponse): MapRenderingSummary {
+  const points = response.data.filter(
+    (feature) => feature.geometry.type === "Point",
+  );
+  const lines = response.data.filter(
+    (feature) => feature.geometry.type === "LineString",
+  );
+  const polygons = response.data.filter(
+    (feature) => feature.geometry.type === "Polygon",
+  );
+  return {
+    points: {
+      total: points.reduce((total, feature) => total + feature.count, 0),
+      rendered: points.length,
+      truncated: response.truncated,
+      simplified: false,
+      clustered: response.clustered,
+    },
+    lines: {
+      total: lines.length,
+      rendered: lines.length,
+      truncated: false,
+      simplified: false,
+    },
+    polygons: {
+      total: polygons.length,
+      rendered: polygons.length,
+      truncated: false,
+      simplified: false,
+    },
+  };
+}
 
 function clusterMarkerHtml(feature: MapFeature): string {
   const color = normalizeMapColor(feature.symbol.color);
@@ -184,6 +245,7 @@ export function MultiAppMap({
     const render = async (response: MapResponse) => {
       const leaflet = await import("leaflet");
       if (!active || !map.current) return;
+      const rendering = response.rendering ?? fallbackRendering(response);
       const collection: FeatureCollection<Geometry, MapFeature> = {
         type: "FeatureCollection",
         features: response.data.map((feature) => ({
@@ -260,6 +322,7 @@ export function MultiAppMap({
         totalRecords: response.totalRecords,
         clustered: response.clustered,
         truncated: response.truncated,
+        rendering,
       });
     };
 

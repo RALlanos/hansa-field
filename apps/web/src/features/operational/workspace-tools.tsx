@@ -3,7 +3,10 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import type { Catalog } from "./contracts";
-import type { MultiAppMapStatus } from "../maps/multi-app-map";
+import {
+  emptyMapRendering,
+  type MultiAppMapStatus,
+} from "../maps/multi-app-map";
 import { SegmentationAdmin } from "../segmentation/segmentation-admin";
 
 const MultiAppMap = dynamic(
@@ -32,7 +35,8 @@ export function WorkspaceSegmentation({
           <p className="op-kicker">Organización de registros</p>
           <h2>Segmentación</h2>
           <p>
-            Crea estructuras opcionales para ordenar registros sin crear más Apps o Proyectos.
+            Crea estructuras opcionales para ordenar registros sin crear más
+            Apps o Proyectos.
           </p>
         </div>
       </header>
@@ -67,7 +71,10 @@ export function WorkspaceSegmentation({
       ) : (
         <div className="workspace-segmentation-empty">
           <strong>Elige dónde organizar los registros.</strong>
-          <p>La Segmentación de una App clasifica sus Records. La de un Proyecto clasifica solamente sus Project Records.</p>
+          <p>
+            La Segmentación de una App clasifica sus Records. La de un Proyecto
+            clasifica solamente sus Project Records.
+          </p>
         </div>
       )}
     </section>
@@ -85,6 +92,7 @@ export function WorkspaceUniversalMap({ catalog }: { catalog: Catalog }) {
     totalRecords: 0,
     clustered: false,
     truncated: false,
+    rendering: emptyMapRendering,
   });
   const localCollections = catalog.collections.filter(
     (collection, index, all) =>

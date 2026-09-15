@@ -49,7 +49,16 @@ it("clusters only point geometries and leaves linear geometries as map features"
     async query<T>(sql: string, values?: readonly unknown[]) {
       calls.push({ sql, values });
       if (sql.includes("point_total"))
-        return { rows: [{ total: 4_001, point_total: 4_000 }] as T[] };
+        return {
+          rows: [
+            {
+              total: 4_001,
+              point_total: 4_000,
+              line_total: 1,
+              polygon_total: 0,
+            },
+          ] as T[],
+        };
       if (sql.includes("ST_GeometryType(geometry) = 'ST_Point'"))
         return { rows: [] as T[] };
       if (sql.includes("ST_GeometryType(geometry) IN"))
@@ -88,11 +97,17 @@ it("clusters only point geometries and leaves linear geometries as map features"
       mode: "app",
       appIds: ["00000000-0000-4000-8000-000000000102"],
       bbox: [-69, -18, -68, -17],
+      zoom: 8,
       budget: 100,
     }),
   );
 
   expect(result.clustered).toBe(true);
+  expect(result.rendering).toMatchObject({
+    points: { total: 4_000, clustered: true },
+    lines: { total: 1, rendered: 1, simplified: true },
+    polygons: { total: 0, rendered: 0 },
+  });
   expect(
     result.data.some(
       (feature) => feature.geometry.type === "LineString" && !feature.isCluster,
@@ -104,5 +119,8 @@ it("clusters only point geometries and leaves linear geometries as map features"
         "ST_GeometryType(geometry) IN ('ST_LineString', 'ST_Polygon')",
       ),
     ),
+  ).toBe(true);
+  expect(
+    calls.some((call) => call.sql.includes("ST_SimplifyPreserveTopology")),
   ).toBe(true);
 });

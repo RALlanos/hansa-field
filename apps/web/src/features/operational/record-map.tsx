@@ -1,11 +1,10 @@
 "use client";
 import { useCallback } from "react";
-import { MultiAppMap } from "../maps/multi-app-map";
+import { MultiAppMap, type MultiAppMapStatus } from "../maps/multi-app-map";
 import type { MapBounds } from "../maps/multi-app-map-model";
 import { recordScope } from "./record-scope";
 import type { Catalog, Row } from "./contracts";
 
-const ignoreStatus = () => {};
 export function RecordMap({
   catalog,
   projectId,
@@ -14,6 +13,7 @@ export function RecordMap({
   refresh,
   onBounds,
   onSelect,
+  onStatus,
 }: {
   catalog: Catalog;
   projectId: string;
@@ -22,6 +22,7 @@ export function RecordMap({
   segmentIds: readonly string[];
   onBounds: (bbox: string) => void;
   onSelect: (row: Row) => void;
+  onStatus: (status: MultiAppMapStatus) => void;
 }) {
   const scope = recordScope(catalog, projectId, datasetId);
   const bounds = useCallback(
@@ -36,7 +37,7 @@ export function RecordMap({
       localCollectionIds={scope.localCollectionIds ?? []}
       segmentIds={segmentIds}
       refresh={refresh}
-      onStatus={ignoreStatus}
+      onStatus={onStatus}
       onViewportChange={bounds}
       onSelect={(feature) => {
         if (!feature.recordUuid) return;

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import type { Catalog, Row } from "../operational/contracts";
-import type { MultiAppMapStatus } from "../maps/multi-app-map";
+import {
+  emptyMapRendering,
+  type MultiAppMapStatus,
+} from "../maps/multi-app-map";
 import { RecordInspector } from "../records/record-inspector";
 
 const MultiAppMap = dynamic(
@@ -25,6 +28,7 @@ export function UniversalMapWorkspace({ catalog }: { catalog: Catalog }) {
     totalRecords: 0,
     clustered: false,
     truncated: false,
+    rendering: emptyMapRendering,
   });
 
   const localCollections = catalog.collections.filter(
