@@ -6,7 +6,6 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 
-import { MAP_ICON_IDS } from "../apps/map-icons.js";
 import { DatabaseService } from "../database/database.service.js";
 import { templateInput } from "./template-contract.js";
 const LOCAL_ORGANIZATION = "00000000-0000-4000-8000-000000000001";
@@ -39,8 +38,6 @@ type SourceForm = {
   readonly elements: readonly SourceElement[];
   readonly status: SourceElement | null;
 };
-
-type CloneStrategy = "preserve" | "sections" | "fieldValues";
 
 const cloneInput = z
   .object({
