@@ -43,6 +43,11 @@ type ClusterRow = {
 };
 
 type SettingsRow = { project_app_id: string; settings: unknown };
+type DatasetStyleRow = { dataset_id: string; schema_definition: unknown };
+type ValueStyle = {
+  fieldId: string;
+  rules: Map<string, { color?: string; icon?: string }>;
+};
 
 const defaultColor = "#3d7398";
 const fallbackIcons = [
@@ -188,9 +193,12 @@ export class MapRecordsService {
     const overrides = await this.loadOverrides(organizationId, [
       ...new Set(rows.map((row) => row.project_app_id).filter(Boolean)),
     ] as string[]);
+    const styles = await this.loadDatasetStyles(organizationId, [
+      ...new Set(rows.map((row) => row.dataset_id)),
+    ]);
     return {
       data: rows.map((row) => ({
-        ...this.toFeature(row, overrides, 1),
+        ...this.toFeature(row, overrides, styles, 1),
         attributes: row.attributes,
         updatedAt: row.updated_at,
       })),
@@ -218,9 +226,12 @@ export class MapRecordsService {
     const overrides = await this.loadOverrides(organizationId, [
       ...new Set(result.rows.map((r) => r.project_app_id).filter(Boolean)),
     ] as string[]);
+    const styles = await this.loadDatasetStyles(organizationId, [
+      ...new Set(result.rows.map((row) => row.dataset_id)),
+    ]);
     const rows = result.rows.slice(0, scope.budget);
     return {
-      data: rows.map((row) => this.toFeature(row, overrides, 1)),
+      data: rows.map((row) => this.toFeature(row, overrides, styles, 1)),
       clustered: false,
       totalRecords: await this.scopeCount(base, where, filterParams),
       truncated: result.rows.length > scope.budget,
@@ -304,14 +315,24 @@ export class MapRecordsService {
   private toFeature(
     row: VisibleRow,
     overrides: Map<string, MapSymbol>,
+    styles: Map<string, ValueStyle>,
     count: number,
   ): MapFeatureDto {
-    const symbol = resolveSymbol(overrides, {
+    const base = resolveSymbol(overrides, {
       projectAppId: row.project_app_id,
       appId: row.app_id,
       appName: row.app_name,
       datasetName: row.dataset_name,
     });
+    const style = styles.get(row.dataset_id);
+    const rawValue = style ? row.attributes[style.fieldId] : undefined;
+    const value = Array.isArray(rawValue)
+      ? rawValue.find((item): item is string => typeof item === "string")
+      : rawValue;
+    const symbol =
+      typeof value === "string" && style?.rules.get(value)
+        ? { ...base, ...style.rules.get(value) }
+        : base;
     return {
       id: row.project_record_uuid ?? row.record_uuid,
       recordUuid: row.record_uuid,
@@ -345,6 +366,60 @@ export class MapRecordsService {
       if (symbol) map.set(row.project_app_id, symbol);
     }
     return map;
+  }
+
+  private async loadDatasetStyles(
+    organizationId: string,
+    datasetIds: string[],
+  ): Promise<Map<string, ValueStyle>> {
+    const styles = new Map<string, ValueStyle>();
+    if (!datasetIds.length) return styles;
+    const result = await this.database.query<DatasetStyleRow>(
+      `SELECT d.id dataset_id,v.schema_definition FROM datasets d
+       JOIN LATERAL (
+         SELECT schema_definition FROM dataset_versions
+         WHERE dataset_id=d.id ORDER BY version DESC LIMIT 1
+       ) v ON true
+       WHERE d.organization_id=$1 AND d.id=ANY($2::uuid[])`,
+      [organizationId, datasetIds],
+    );
+    for (const row of result.rows) {
+      const settings =
+        row.schema_definition && typeof row.schema_definition === "object"
+          ? (row.schema_definition as { settings?: unknown }).settings
+          : null;
+      const mapStyle =
+        settings && typeof settings === "object"
+          ? (settings as { mapStyle?: unknown }).mapStyle
+          : null;
+      if (!mapStyle || typeof mapStyle !== "object") continue;
+      const candidate = mapStyle as {
+        fieldId?: unknown;
+        rules?: unknown;
+      };
+      if (
+        typeof candidate.fieldId !== "string" ||
+        !Array.isArray(candidate.rules)
+      )
+        continue;
+      const rules = new Map<string, { color?: string; icon?: string }>();
+      for (const rule of candidate.rules) {
+        if (!rule || typeof rule !== "object") continue;
+        const item = rule as {
+          value?: unknown;
+          color?: unknown;
+          icon?: unknown;
+        };
+        if (typeof item.value !== "string") continue;
+        const symbol: { color?: string; icon?: string } = {};
+        if (typeof item.color === "string") symbol.color = item.color;
+        if (typeof item.icon === "string") symbol.icon = item.icon;
+        if (symbol.color || symbol.icon) rules.set(item.value, symbol);
+      }
+      if (rules.size)
+        styles.set(row.dataset_id, { fieldId: candidate.fieldId, rules });
+    }
+    return styles;
   }
 
   private readSymbolSettings(settings: unknown): MapSymbol | null {

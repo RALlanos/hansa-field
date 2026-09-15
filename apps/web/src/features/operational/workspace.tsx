@@ -12,6 +12,7 @@ import { UniversalMapWorkspace } from "../universal-map/universal-map";
 import { WorkspaceSegmentation } from "./workspace-tools";
 import "./workspace.css";
 import TemplateBuilder from "../templates/template-builder";
+import { FulcrumCloneWizard } from "../apps/fulcrum-clone-wizard";
 import { cacheKeys, localDataCache } from "../../lib/local-data-cache";
 
 const emptySchema: Schema = { sections: [] };
@@ -77,6 +78,7 @@ export function OperationalWorkspace({
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [segmentationContext, setSegmentationContext] = useState("");
+  const [showFulcrumClone, setShowFulcrumClone] = useState(false);
 
   useEffect(() => {
     setSection(sectionFromPath);
@@ -432,6 +434,36 @@ export function OperationalWorkspace({
               <div className="p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-800">
                 {error}
               </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 p-4 bg-sky-50 border border-sky-100 rounded-lg">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Traer estructura desde Fulcrum
+                </h2>
+                <p className="text-xs text-slate-600 mt-1">
+                  Copia la configuración hacia Hansa; los registros se importan
+                  después, con preview.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFulcrumClone(true)}
+                className="shrink-0 px-3 py-2 text-xs font-semibold text-sky-700 bg-white border border-sky-300 hover:bg-sky-50 rounded"
+              >
+                Conectar Fulcrum
+              </button>
+            </div>
+
+            {showFulcrumClone && (
+              <FulcrumCloneWizard
+                catalog={catalog}
+                onClose={() => setShowFulcrumClone(false)}
+                onComplete={async () => {
+                  await reload(true);
+                  setRefresh((value) => value + 1);
+                }}
+              />
             )}
 
             {/* Create App Form */}

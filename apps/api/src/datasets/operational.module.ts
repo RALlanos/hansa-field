@@ -8,6 +8,7 @@ import { WorkspaceChangesService } from "./workspace-changes.service.js";
 import { OperationalController } from "./operational.controller.js";
 import { OperationalImportsController } from "./operational-imports.controller.js";
 import { TemplatesController } from "./templates.controller.js";
+import { FulcrumIntegrationService } from "./fulcrum-integration.service.js";
 
 @Module({
   imports: [DatabaseModule],
@@ -36,6 +37,11 @@ import { TemplatesController } from "./templates.controller.js";
       provide: WorkspaceChangesService,
       inject: [DatabaseService],
       useFactory: (db: DatabaseService) => new WorkspaceChangesService(db),
+    },
+    {
+      provide: FulcrumIntegrationService,
+      inject: [DatabaseService],
+      useFactory: (db: DatabaseService) => new FulcrumIntegrationService(db),
     },
   ],
 })

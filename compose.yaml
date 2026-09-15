@@ -27,6 +27,8 @@ services:
       API_HOST: 0.0.0.0
       WEB_ORIGIN: http://localhost:3200
       DATABASE_URL: postgresql://${POSTGRES_USER:-hansa_field}:${POSTGRES_PASSWORD:-change-me-local-only}@database:5432/${POSTGRES_DB:-hansa_field}
+      FULCRUM_API_TOKEN: ${FULCRUM_API_TOKEN:-}
+      FULCRUM_API_URL: ${FULCRUM_API_URL:-https://api.fulcrumapp.com/api/v2}
     command: >
       sh -c "pnpm --filter @hansa-field/api db:migrate && pnpm --filter @hansa-field/api start"
     ports:

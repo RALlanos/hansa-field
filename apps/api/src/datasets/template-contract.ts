@@ -83,6 +83,31 @@ export const templateInput = z
             .min(1),
           mapIcon: z.enum(MAP_ICON_IDS),
           mapColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+          mapStyle: z
+            .object({
+              fieldId: z.string().uuid(),
+              rules: z
+                .array(
+                  z
+                    .object({
+                      value: z.string().trim().min(1).max(250),
+                      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+                      icon: z.enum(MAP_ICON_IDS).optional(),
+                    })
+                    .strict(),
+                )
+                .min(1)
+                .max(100),
+            })
+            .strict()
+            .optional(),
+          sourceRouting: z
+            .object({
+              fieldKey: z.string().trim().min(1).max(128),
+              value: z.string().trim().min(1).max(250),
+            })
+            .strict()
+            .optional(),
         })
         .strict(),
     }),

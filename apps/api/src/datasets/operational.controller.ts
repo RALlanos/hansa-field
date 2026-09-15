@@ -25,6 +25,7 @@ import {
   WorkspaceChangesService,
   type WorkspaceChangesCursor,
 } from "./workspace-changes.service.js";
+import { FulcrumIntegrationService } from "./fulcrum-integration.service.js";
 
 export const LOCAL_ORGANIZATION = "00000000-0000-4000-8000-000000000001";
 const uuid = z.string().uuid();
@@ -53,6 +54,8 @@ export class OperationalController {
     private readonly mapRecords: MapRecordsService,
     @Inject(WorkspaceChangesService)
     private readonly changes: WorkspaceChangesService,
+    @Inject(FulcrumIntegrationService)
+    private readonly fulcrum: FulcrumIntegrationService,
   ) {}
   private actor(operationId: string) {
     return {
@@ -120,6 +123,17 @@ export class OperationalController {
       collections: collections.rows,
       blocks: blocks.rows,
     };
+  }
+  @Get("fulcrum/forms") formsFromFulcrum() {
+    return this.fulcrum.forms();
+  }
+  @Get("fulcrum/forms/:formId") previewFulcrumForm(
+    @Param("formId") formId: string,
+  ) {
+    return this.fulcrum.preview(uuid.parse(formId));
+  }
+  @Post("fulcrum/clone") cloneFromFulcrum(@Body() body: unknown) {
+    return this.fulcrum.clone(body);
   }
   @Post("apps") app(@Body() body: unknown) {
     const input = z
