@@ -49,6 +49,12 @@ const cloneInput = z
     formId: z.string().uuid(),
     strategy: z.enum(["preserve", "sections", "fieldValues"]),
     recordsMode: z.enum(["structure", "records"]).default("structure"),
+    recordBatch: z
+      .object({
+        page: z.number().int().min(1).default(1),
+        size: z.number().int().min(100).max(10_000).default(1_000),
+      })
+      .default({ page: 1, size: 1_000 }),
     splitFieldKey: z.string().min(1).max(128).optional(),
     projectId: z.string().uuid().optional(),
     projectName: z.string().trim().min(1).max(160).optional(),
@@ -496,24 +502,32 @@ export class FulcrumIntegrationService {
     };
   }
 
-  private async records(formId: string, requestToken?: string) {
-    const records: unknown[] = [];
-    const perPage = 1_000;
-    const maximum = 10_000;
-    for (let page = 1; records.length < maximum; page += 1) {
-      const body = asRecord(
-        await this.get(
-          `/records.json?form_id=${encodeURIComponent(formId)}&per_page=${perPage}&page=${page}`,
-          requestToken,
-        ),
-      );
-      const pageRecords = Array.isArray(body.records) ? body.records : [];
-      records.push(...pageRecords);
-      if (pageRecords.length < perPage) return records;
-    }
-    throw new BadRequestException(
-      "Esta importación tiene más de 10.000 registros. Usa primero la estructura y luego una importación masiva por lotes.",
+  private async records(
+    formId: string,
+    batch: { page: number; size: number },
+    requestToken?: string,
+  ) {
+    const body = asRecord(
+      await this.get(
+        `/records.json?form_id=${encodeURIComponent(formId)}&per_page=${batch.size}&page=${batch.page}`,
+        requestToken,
+      ),
     );
+    const records = Array.isArray(body.records) ? body.records : [];
+    const pagination = asRecord(body.pagination);
+    const total =
+      typeof body.total_count === "number"
+        ? body.total_count
+        : typeof pagination.total_count === "number"
+          ? pagination.total_count
+          : null;
+    return {
+      records,
+      page: batch.page,
+      size: batch.size,
+      nextPage: records.length === batch.size ? batch.page + 1 : null,
+      total,
+    };
   }
 
   private async importRecords(
@@ -683,10 +697,10 @@ export class FulcrumIntegrationService {
       throw new BadRequestException(
         "La estrategia elegida no produjo Apps. Revisa la configuración del formulario origen.",
       );
-    const sourceRecords =
+    const sourceBatch =
       input.recordsMode === "records"
-        ? await this.records(form.id, requestToken)
-        : [];
+        ? await this.records(form.id, input.recordBatch, requestToken)
+        : null;
     const structure = await this.database.withTransaction(async (tx) => {
       let projectId = input.projectId;
       if (input.projectName) {
@@ -814,7 +828,11 @@ export class FulcrumIntegrationService {
     });
     const records =
       input.recordsMode === "records"
-        ? await this.importRecords(form, structure.targets, sourceRecords)
+        ? await this.importRecords(
+            form,
+            structure.targets,
+            sourceBatch?.records ?? [],
+          )
         : { imported: 0, updated: 0, skipped: 0, issues: [] };
     return {
       source: structure.source,
@@ -825,6 +843,15 @@ export class FulcrumIntegrationService {
       recordsUpdated: records.updated,
       recordsSkipped: records.skipped,
       issues: records.issues,
+      batch: sourceBatch
+        ? {
+            page: sourceBatch.page,
+            size: sourceBatch.size,
+            received: sourceBatch.records.length,
+            nextPage: sourceBatch.nextPage,
+            total: sourceBatch.total,
+          }
+        : null,
     };
   }
 }

@@ -65,6 +65,8 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
   const [recordsMode, setRecordsMode] = useState<"structure" | "records">(
     "structure",
   );
+  const [batchPage, setBatchPage] = useState(1);
+  const [batchSize, setBatchSize] = useState(1_000);
   const [splitFieldKey, setSplitFieldKey] = useState("");
   const [projectMode, setProjectMode] = useState<"none" | "existing" | "new">(
     "none",
@@ -136,6 +138,7 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
   const selectedSplit = splitCandidates.find(
     (field) => field.key === splitFieldKey,
   );
+  const selectedForm = forms.find((form) => form.id === formId);
   const canSubmit = Boolean(
     preview &&
     (strategy !== "fieldValues" || selectedSplit) &&
@@ -156,10 +159,18 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
         recordsUpdated: number;
         recordsSkipped: number;
         issues: string[];
+        batch: {
+          page: number;
+          size: number;
+          received: number;
+          nextPage: number | null;
+          total: number | null;
+        } | null;
       }>("/fulcrum/clone", activeToken, {
         formId: preview.id,
         strategy,
         recordsMode,
+        recordBatch: { page: batchPage, size: batchSize },
         ...(strategy === "fieldValues" ? { splitFieldKey } : {}),
         ...(projectMode === "existing" ? { projectId } : {}),
         ...(projectMode === "new" ? { projectName: projectName.trim() } : {}),
@@ -168,7 +179,7 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
       setImportIssues(result.issues);
       setMessage(
         recordsMode === "records"
-          ? `${result.apps.length} App(s) preparadas. Registros: ${result.recordsImported} nuevos, ${result.recordsUpdated} actualizados y ${result.recordsSkipped} omitidos.${result.issues.length ? " Revisa las incidencias mostradas." : ""}`
+          ? `Lote ${result.batch?.page ?? batchPage}: ${result.recordsImported} nuevos, ${result.recordsUpdated} actualizados y ${result.recordsSkipped} omitidos (${result.batch?.received ?? 0} recibidos).${result.batch?.nextPage ? ` Continúa con el lote ${result.batch.nextPage}.` : ""}${result.issues.length ? " Revisa las incidencias mostradas." : ""}`
           : `${result.apps.length} App(s) ${result.apps.every((app) => !app.created) ? "ya existían" : "creada(s)"}${result.projectId ? " y vinculada(s) al Proyecto" : ""}. No se importaron registros.`,
       );
     } catch (reason: unknown) {
@@ -358,6 +369,51 @@ export function FulcrumCloneWizard({ catalog, onComplete, onClose }: Props) {
                   destino de cada registro. Para traer datos usa la App completa
                   o separar por valores de un campo.
                 </p>
+              )}
+              {recordsMode === "records" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 border border-sky-200 bg-sky-50 rounded">
+                  <label className="text-xs font-medium text-slate-700 space-y-1">
+                    <span>Tamaño de lote</span>
+                    <select
+                      value={batchSize}
+                      onChange={(event) => {
+                        setBatchSize(Number(event.target.value));
+                        setBatchPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded bg-white"
+                    >
+                      <option value={500}>500 registros</option>
+                      <option value={1000}>1.000 registros</option>
+                      <option value={5000}>5.000 registros</option>
+                      <option value={10000}>10.000 registros</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-slate-700 space-y-1">
+                    <span>Número de lote</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={batchPage}
+                      onChange={(event) =>
+                        setBatchPage(
+                          Math.max(1, Number(event.target.value) || 1),
+                        )
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded bg-white"
+                    />
+                  </label>
+                  <p className="sm:col-span-2 text-[11px] text-slate-600">
+                    {selectedForm?.recordCount === null ||
+                    selectedForm?.recordCount === undefined
+                      ? `Importará el lote ${batchPage} de hasta ${batchSize.toLocaleString("es-BO")} registros.`
+                      : (batchPage - 1) * batchSize >= selectedForm.recordCount
+                        ? "Ese lote está fuera del total informado por Fulcrum."
+                        : `Importará registros ${(batchPage - 1) * batchSize + 1}–${Math.min(batchPage * batchSize, selectedForm.recordCount).toLocaleString("es-BO")} de ${selectedForm.recordCount.toLocaleString("es-BO")}.`}
+                    Repite con el siguiente lote; los mismos IDs se actualizan,
+                    no se duplican.
+                  </p>
+                </div>
               )}
             </fieldset>
 
