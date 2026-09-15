@@ -22,7 +22,7 @@ try {
   await client.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
   await migrateUp(client);
   await client.query(
-    "INSERT INTO organizations(id,name) VALUES('00000000-0000-4000-8000-000000000001','Hansa Field Desarrollo')",
+    "INSERT INTO organizations(id,name) VALUES('00000000-0000-4000-8000-000000000001','Hansa Field Desarrollo') ON CONFLICT(id) DO NOTHING",
   );
   const result = await client.query(
     "SELECT PostGIS_Version() postgis,(SELECT count(*)::int FROM records) records,(SELECT count(*)::int FROM datasets) datasets",
