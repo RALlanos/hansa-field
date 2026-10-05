@@ -43,6 +43,42 @@ it("uses a selected segment and its descendants when querying the map", async ()
   expect(calls[0]?.values).toContainEqual([segmentId]);
 });
 
+it("returns an exact viewport summary without loading geometries", async () => {
+  const calls: string[] = [];
+  const database: DatabaseQuery = {
+    async query<T>(sql: string) {
+      calls.push(sql);
+      return {
+        rows: [
+          { total: 42, point_total: 38, line_total: 3, polygon_total: 1 },
+        ] as T[],
+      };
+    },
+  };
+  const service = new MapRecordsService(database);
+
+  const result = await service.map(
+    "00000000-0000-4000-8000-000000000001",
+    mapScopeSchema.parse({
+      mode: "app",
+      appIds: ["00000000-0000-4000-8000-000000000102"],
+      bbox: [-69, -18, -68, -17],
+      includeFeatures: false,
+    }),
+  );
+
+  expect(result).toMatchObject({
+    data: [],
+    totalRecords: 42,
+    rendering: {
+      points: { total: 38, rendered: 0 },
+      lines: { total: 3, rendered: 0 },
+      polygons: { total: 1, rendered: 0 },
+    },
+  });
+  expect(calls).toHaveLength(1);
+});
+
 it("clusters only point geometries and leaves linear geometries as map features", async () => {
   const calls: { sql: string; values: readonly unknown[] | undefined }[] = [];
   const database: DatabaseQuery = {

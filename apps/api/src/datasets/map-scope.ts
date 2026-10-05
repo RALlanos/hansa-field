@@ -38,7 +38,9 @@ export const mapScopeSchema = z
       z.coerce.number().min(-90).max(90),
     ]),
     zoom: z.coerce.number().int().min(0).max(24).default(12),
-    budget: z.coerce.number().int().min(10).max(10_000).default(2_500),
+    budget: z.coerce.number().int().min(10).max(10_000).default(1_500),
+    /** A lightweight viewport count used while the map reuses cached geometry. */
+    includeFeatures: z.boolean().optional().default(true),
   })
   .strict();
 

@@ -17,4 +17,16 @@ describe("buildMapRecordsUrl", () => {
       "http://localhost:3100/api/workspace/map?mode=project&bbox=-69.12346%2C-23%2C-57%2C-9.12346&zoom=8&budget=4000&appIds=app-one%2Capp-two&projectIds=project-one",
     );
   });
+
+  it("can request only the exact viewport summary", () => {
+    const url = buildMapRecordsUrl("http://localhost:3100", {
+      mode: "app",
+      appIds: ["app-one"],
+      bbox: [-64.5, -17, -64, -16.5],
+      zoom: 12,
+      includeFeatures: false,
+    });
+
+    expect(url).toContain("includeFeatures=false");
+  });
 });

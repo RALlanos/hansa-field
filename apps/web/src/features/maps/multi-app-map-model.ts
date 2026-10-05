@@ -10,6 +10,7 @@ export type MapScopeInput = Readonly<{
   bbox: MapBounds;
   zoom: number;
   budget?: number;
+  includeFeatures?: boolean;
 }>;
 
 export function buildMapRecordsUrl(
@@ -20,8 +21,10 @@ export function buildMapRecordsUrl(
     mode: scope.mode,
     bbox: scope.bbox.map((value) => Number(value.toFixed(5))).join(","),
     zoom: String(Math.round(scope.zoom)),
-    budget: String(scope.budget ?? 4000),
+    budget: String(scope.budget ?? 1500),
   });
+  if (scope.includeFeatures === false)
+    parameters.set("includeFeatures", "false");
   if (scope.appIds?.length) parameters.set("appIds", scope.appIds.join(","));
   if (scope.projectIds?.length)
     parameters.set("projectIds", scope.projectIds.join(","));

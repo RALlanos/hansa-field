@@ -317,11 +317,7 @@ export function RecordsWorkspace({
 
           {/* Count Badge */}
           <span className="bg-slate-800 text-sky-400 border border-slate-700 px-2.5 py-0.5 rounded text-xs font-semibold shrink-0">
-            {(viewMode === "table"
-              ? page.total
-              : (mapStatus?.totalRecords ?? page.total)
-            ).toLocaleString("es-BO")}{" "}
-            registros
+            {page.total.toLocaleString("es-BO")} registros
           </span>
         </div>
 
@@ -445,6 +441,7 @@ export function RecordsWorkspace({
                 datasetId={datasetId}
                 segmentIds={segmentFilter ? [segmentFilter.id] : []}
                 refresh={refresh}
+                viewportTotal={page.total}
                 onBounds={handleBoundsChange}
                 onStatus={setMapStatus}
                 onSelect={(row) => {
@@ -461,9 +458,7 @@ export function RecordsWorkspace({
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span className="font-medium">
-                {mapStatus
-                  ? `${mapStatus.totalRecords.toLocaleString("es-BO")} en esta área`
-                  : "Consultando área"}
+                {`${page.total.toLocaleString("es-BO")} en esta área`}
               </span>
               {mapStatus?.rendering.points.total ? (
                 <span className="text-slate-300">

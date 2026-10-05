@@ -487,6 +487,9 @@ export class OperationalController {
       ...(typeof query.segmentIds === "string"
         ? { segmentIds: query.segmentIds.split(",").filter(Boolean) }
         : {}),
+      ...(typeof query.includeFeatures === "string"
+        ? { includeFeatures: query.includeFeatures !== "false" }
+        : {}),
     });
     if (input.bbox[0] >= input.bbox[2] || input.bbox[1] >= input.bbox[3])
       throw new BadRequestException("Área inválida.");

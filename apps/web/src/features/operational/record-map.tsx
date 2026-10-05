@@ -11,6 +11,7 @@ export function RecordMap({
   datasetId,
   segmentIds,
   refresh,
+  viewportTotal,
   onBounds,
   onSelect,
   onStatus,
@@ -19,6 +20,7 @@ export function RecordMap({
   projectId: string;
   datasetId: string;
   refresh: number;
+  viewportTotal: number;
   segmentIds: readonly string[];
   onBounds: (bbox: string) => void;
   onSelect: (row: Row) => void;
@@ -37,6 +39,7 @@ export function RecordMap({
       localCollectionIds={scope.localCollectionIds ?? []}
       segmentIds={segmentIds}
       refresh={refresh}
+      viewportTotal={viewportTotal}
       onStatus={onStatus}
       onViewportChange={bounds}
       onSelect={(feature) => {

@@ -173,7 +173,38 @@ export class MapRecordsService {
     );
     const totalRecords = count.rows[0]?.total ?? 0;
     const pointTotal = count.rows[0]?.point_total ?? 0;
+    const lineTotal = count.rows[0]?.line_total ?? 0;
+    const polygonTotal = count.rows[0]?.polygon_total ?? 0;
     const pointsClustered = pointTotal > scope.budget;
+    if (!scope.includeFeatures) {
+      return {
+        data: [],
+        clustered: pointsClustered,
+        totalRecords,
+        truncated: false,
+        rendering: {
+          points: {
+            total: pointTotal,
+            rendered: 0,
+            truncated: false,
+            simplified: false,
+            clustered: pointsClustered,
+          },
+          lines: {
+            total: lineTotal,
+            rendered: 0,
+            truncated: false,
+            simplified: false,
+          },
+          polygons: {
+            total: polygonTotal,
+            rendered: 0,
+            truncated: false,
+            simplified: false,
+          },
+        },
+      };
+    }
     const pointFeatures = pointsClustered
       ? await this.pointClusters(
           organizationId,
@@ -208,8 +239,6 @@ export class MapRecordsService {
     ).length;
     const renderedPoints =
       pointFeatures.rows.length + pointFeatures.clusters.length;
-    const lineTotal = count.rows[0]?.line_total ?? 0;
-    const polygonTotal = count.rows[0]?.polygon_total ?? 0;
     const overrides = await this.loadOverrides(organizationId, [
       ...new Set(rawFeatures.map((row) => row.project_app_id).filter(Boolean)),
     ] as string[]);
@@ -361,8 +390,8 @@ export class MapRecordsService {
         SELECT * FROM visible WHERE (${where || "true"})
           AND ST_GeometryType(geometry) = 'ST_Point'
       ), points AS (
-        SELECT floor((ST_X(geometry)-$5)/$${cellWidthParam}) gx,
-               floor((ST_Y(geometry)-$6)/$${cellHeightParam}) gy,
+        SELECT floor((ST_X(geometry)+180)/$${cellWidthParam}) gx,
+               floor((ST_Y(geometry)+90)/$${cellHeightParam}) gy,
                count(*)::integer count,
                ST_AsGeoJSON(ST_Centroid(ST_Collect(geometry)))::jsonb geometry,
                dataset_id, app_id,
